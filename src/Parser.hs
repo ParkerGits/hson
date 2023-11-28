@@ -151,7 +151,7 @@ equality = do
 
 comparison :: HSONParser Expr
 comparison = do
-  chainl1 term (try gtParser <|> try gteParser <|> try ltParser <|> lteParser)
+  chainl1 term (try gteParser <|> try gtParser <|> try lteParser <|> ltParser)
   where
     gtParser = parseBinOp ">" Greater
     gteParser = parseBinOp ">=" GreaterEqual
