@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Lexer where
 
 import           Control.Monad.Identity (Identity)
@@ -88,6 +89,8 @@ parens = P.parens hsonLexer
 numberLiteral = P.naturalOrFloat hsonLexer
 
 stringLiteral = P.stringLiteral hsonLexer
+
+dot = P.dot hsonLexer
 
 identifier = do
   name <- P.identifier hsonLexer

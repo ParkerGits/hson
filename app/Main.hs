@@ -1,7 +1,7 @@
 module Main where
 
 import qualified NativeFunction (someFunc)
-import qualified Parser         (test)
+import           Parser
 
 main :: IO ()
 main = do

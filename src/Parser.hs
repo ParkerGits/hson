@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Parser ( getInput ) where
+module Parser ( test ) where
 
 import           Control.Arrow                 (ArrowChoice (right))
 import           Control.Monad.Identity
 import           Control.Monad.Reader
 import           Control.Monad.RWS             (MonadReader (ask))
+import           Data.Function
 import           Data.Maybe
 import           Data.Scientific               (Scientific, fromFloatDigits)
 import           Data.Text                     (Text, pack, unpack)
@@ -32,6 +33,7 @@ data Expr = BinaryExpr Binary
           | CallExpr Call
           | ConditionalExpr Conditional
           | GroupingExpr Grouping
+          | GetExpr Get
           | LiteralExpr Literal
           | LogicalExpr Logical
           | UnaryExpr Unary
@@ -57,6 +59,12 @@ data Conditional = Conditional
                      , matched   :: Expr
                      , unmatched :: Expr
                      }
+  deriving (Show)
+
+data Get = Get
+             { object   :: Expr
+             , property :: Token
+             }
   deriving (Show)
 
 newtype Grouping = Grouping { groupingExpr :: Expr }
@@ -143,7 +151,7 @@ comparison = do
 
 term :: HSONParser Expr
 term = do
-  chainl1 comparison (try plusParser <|> minusParser)
+  chainl1 factor (try plusParser <|> minusParser)
     where
       minusParser  = binOpParser minus
       plusParser = binOpParser plus
@@ -167,10 +175,20 @@ unary = do
 
 call :: HSONParser Expr
 call = do
-  callee <- primary
-  parenPos <- getPosition
-  args <- parens arguments
-  return $ CallExpr Call {callee=callee, paren=Token {tokenType=TokenLeftParen, literal=Nothing, pos=parenPos}, args=args}
+  expr <- primary
+  try (do
+    exprs <- many (try $ callParser <|> getParser)
+    return $ foldl (&) expr exprs
+    ) <|> return expr
+    where
+      callParser = do
+        parenPos <- getPosition
+        args <- parens arguments
+        return $ \callee -> CallExpr Call {callee=callee, paren=Token {tokenType=TokenLeftParen, literal=Nothing, pos=parenPos}, args=args}
+      getParser = do
+        dot
+        property <- identifier
+        return $ \object -> GetExpr Get {object=object, property=property}
 
 primary :: HSONParser Expr
 primary = do
@@ -200,7 +218,7 @@ primary = do
         return $ VariableExpr Variable {varName=varName}
       groupingParser = do
         expr <- parens expression
-        return $ GroupingExpr $ Grouping {groupingExpr=expr}
+        return $ GroupingExpr Grouping {groupingExpr=expr}
 
 
 arguments :: HSONParser [Expr]
@@ -223,3 +241,5 @@ unaryOpParser op = do
       unaryOp <- op
       pos <- getPosition
       return (\r -> UnaryExpr Unary {unaryOp=unaryOp, unaryRight=r})
+
+test s = runParserT expression () "" (pack s)
