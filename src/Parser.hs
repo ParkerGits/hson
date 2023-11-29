@@ -1,22 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Parser ( test ) where
 
-import           Control.Arrow                 (ArrowChoice (right))
-import           Control.Monad.Identity
-import           Control.Monad.Reader
-import           Control.Monad.RWS             (MonadReader (ask))
 import           Data.Function
-import           Data.Maybe
 import           Data.Scientific               (Scientific, fromFloatDigits)
 import           Data.Text                     (Text, pack, unpack)
-import qualified Data.Text.Lazy                as Text
 import           Lexer
 import           Text.Parsec                   (ParsecT, SourcePos, alphaNum,
                                                 between, getPosition, getState,
                                                 letter, oneOf, putState,
                                                 runParserT, sourceLine, string,
                                                 try)
-import qualified Text.Parsec.Token             as P
 import           Text.ParserCombinators.Parsec (chainl1, char, digit, eof,
                                                 getInput, many, runParser,
                                                 sepBy1, space, spaces, (<|>))
