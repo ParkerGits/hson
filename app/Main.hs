@@ -1,14 +1,19 @@
 module Main where
 
-import           Data.Either    (fromLeft)
+import           Control.Monad.IO.Class (MonadIO (liftIO))
+import           Data.Either            (fromLeft)
 import           Interpreter
-import qualified NativeFunction (someFunc)
+import qualified NativeFunction         (someFunc)
 import           Parser
 
 main = do
   str <- getContents
-  snd $ test str
-  evald <- testEval
-  case evald of
-    Left err  -> print err
-    Right val -> print val
+  let v = test str in
+    case v of
+      Left err  -> print err
+      Right val -> do
+        print val
+        result <- testEval $ snd val
+        case result of
+          Left v  -> print v
+          Right v -> print v

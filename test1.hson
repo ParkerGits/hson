@@ -1,1 +1,1 @@
-let i = 0; true + false
+true && 1

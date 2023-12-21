@@ -118,7 +118,7 @@ ternary = do
 
 logicOr :: HSONParser Expr
 logicOr = do
-  chainl1 equality orParser
+  chainl1 logicAnd orParser
     where
       orParser = logicalOpParser orOr
 
