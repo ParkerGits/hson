@@ -1,9 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Parser ( test ) where
 
+module Parser where
+
+import           Control.Monad.Identity        (Identity (runIdentity))
 import           Data.Function
 import           Data.Scientific               (Scientific, fromFloatDigits)
-import           Data.Text                     (Text, pack, unpack)
+import qualified Data.Text                     as T (Text, pack, unpack)
+import           HSONValue
 import           Lexer
 import           Text.Parsec                   (ParsecT, SourcePos, alphaNum,
                                                 between, getPosition, getState,
@@ -63,7 +66,7 @@ data Get = Get
 newtype Grouping = Grouping { groupingExpr :: Expr }
   deriving (Show)
 
-newtype Literal = Literal { value :: LiteralValue }
+newtype Literal = Literal { value :: HSONValue }
   deriving (Show)
 
 data Logical = Logical
@@ -88,7 +91,6 @@ program = do
   expr <- expression
   eof
   return (declarations, expr)
-
 
 varDecl :: HSONParser VarStmt
 varDecl = do
@@ -205,7 +207,7 @@ primary = do
               Left i  -> fromInteger i
       stringParser = do
         str <- stringLiteral
-        return $ LiteralExpr Literal {value=String $ pack str}
+        return $ LiteralExpr Literal {value=String $ T.pack str}
       identParser = do
         varName <- identifier
         return $ VariableExpr Variable {varName=varName}
@@ -235,4 +237,4 @@ unaryOpParser op = do
       pos <- getPosition
       return (\r -> UnaryExpr Unary {unaryOp=unaryOp, unaryRight=r})
 
-test s = runParserT expression () "" (pack s)
+test s = runIdentity $ runParserT program () "" (T.pack s)

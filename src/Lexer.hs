@@ -1,88 +1,83 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Lexer where
 
-import           Control.Monad.Identity (Identity)
-import           Data.Scientific        (Scientific)
-import           Data.Text              (Text, pack)
-import           Text.Parsec            (ParsecT, SourcePos, alphaNum, char,
-                                         getPosition, letter, oneOf, (<|>))
-import qualified Text.Parsec.Token      as P
+import           Control.Monad.Identity     (Identity)
+import           Control.Monad.IO.Class     (MonadIO)
+import           Control.Monad.Reader       (ReaderT)
+import           Control.Monad.Reader.Class (MonadReader)
+import qualified Data.Map                   as Map
+import           Data.Scientific            (Scientific)
+import qualified Data.Text                  as T (Text, pack, unpack)
+import           HSONValue
+import           Text.Parsec                (ParsecT, SourcePos, alphaNum, char,
+                                             getPosition, letter, oneOf, (<|>))
+import qualified Text.Parsec.Token          as P
 
 
-hsonStyle :: P.GenLanguageDef Text () Identity
+hsonStyle :: P.GenLanguageDef T.Text () Identity
 hsonStyle = P.LanguageDef {
   P.reservedOpNames=["&&", "||", "==", "!", "!=", ">", ">=", "<", "<=", "-", "+", "/", "*", "?", ":"], P.reservedNames=["$", "true", "false", "let", "null"], P.opStart=P.opLetter hsonStyle, P.opLetter=oneOf "!&*+/<=>?:\\|-", P.nestedComments=True, P.identStart=letter <|> char '_', P.identLetter=alphaNum <|> oneOf "_'", P.commentStart="/*", P.commentLine="//", P.commentEnd="*/", P.caseSensitive=True
   }
 
-hsonLexer :: P.GenTokenParser Text () Identity
+hsonLexer :: P.GenTokenParser T.Text () Identity
 hsonLexer = P.makeTokenParser hsonStyle
 
 
-data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull
-  deriving (Show)
+type HSONParser = ParsecT T.Text () Identity
 
-data Token = Token
-               { tokenType :: TokenType
-               , literal   :: Maybe LiteralValue
-               , pos       :: SourcePos
-               }
-  deriving (Show)
-
-data LiteralValue = String Text
-                  | Number Scientific
-                  | Bool Bool
-                  | Null
-  deriving (Show)
-
-type HSONParser = ParsecT Text () Identity
-
-token :: TokenType -> String -> HSONParser Token
-token tt s = do
-  P.symbol hsonLexer s
+tokenReservedOp :: TokenType -> String -> HSONParser Token
+tokenReservedOp tt s = do
+  P.reservedOp hsonLexer s
   pos <- getPosition
   return Token {tokenType=tt, literal=Nothing, pos=pos}
 
-letVar = token TokenLet "let"
+tokenReserved :: TokenType -> String -> HSONParser Token
+tokenReserved tt s = do
+  P.reserved hsonLexer s
+  pos <- getPosition
+  return Token {tokenType=tt, literal=Nothing, pos=pos}
 
-equal = token TokenEqual "="
+equal = tokenReservedOp TokenEqual "="
 
-bang = token TokenBang "!"
+bang = tokenReservedOp TokenBang "!"
 
-semicolon = token TokenSemicolon ";"
+semicolon = tokenReservedOp TokenSemicolon ";"
 
-colon = token TokenColon ":"
+colon = tokenReservedOp TokenColon ":"
 
-question = token TokenQuestion "?"
+question = tokenReservedOp TokenQuestion "?"
 
-orOr = token TokenOrOr "||"
+orOr = tokenReservedOp TokenOrOr "||"
 
-andAnd = token TokenAndAnd "&&"
+andAnd = tokenReservedOp TokenAndAnd "&&"
 
-equalEqual= token TokenEqualEqual "=="
+equalEqual= tokenReservedOp TokenEqualEqual "=="
 
-bangEqual = token TokenBangEqual "!="
+bangEqual = tokenReservedOp TokenBangEqual "!="
 
-greater = token TokenGreater ">"
+greater = tokenReservedOp TokenGreater ">"
 
-greaterEqual = token TokenGreaterEqual ">="
+greaterEqual = tokenReservedOp TokenGreaterEqual ">="
 
-less = token TokenLess "<"
+less = tokenReservedOp TokenLess "<"
 
-lessEqual = token TokenLessEqual "<="
+lessEqual = tokenReservedOp TokenLessEqual "<="
 
-minus = token TokenMinus "-"
+minus = tokenReservedOp TokenMinus "-"
 
-plus = token TokenPlus "+"
+plus = tokenReservedOp TokenPlus "+"
 
-star = token TokenStar "*"
+star = tokenReservedOp TokenStar "*"
 
-slash = token TokenSlash "/"
+slash = tokenReservedOp TokenSlash "/"
 
-tokenTrue = token TokenTrue "true"
+letVar = tokenReserved TokenLet "let"
 
-tokenFalse = token TokenFalse "false"
+tokenTrue = tokenReserved TokenTrue "true"
 
-tokenNull = token TokenNull "null"
+tokenFalse = tokenReserved TokenFalse "false"
+
+tokenNull = tokenReserved TokenNull "null"
 
 parens = P.parens hsonLexer
 
@@ -95,4 +90,4 @@ dot = P.dot hsonLexer
 identifier = do
   name <- P.identifier hsonLexer
   pos <- getPosition
-  return Token {tokenType=TokenIdentifier, literal=Just $ String $ pack name, pos=pos}
+  return Token {tokenType=TokenIdentifier, literal = Just $ String $ T.pack name, pos=pos}
