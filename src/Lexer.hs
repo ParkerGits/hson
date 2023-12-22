@@ -87,6 +87,8 @@ stringLiteral = P.stringLiteral hsonLexer
 
 dot = P.dot hsonLexer
 
+comma = P.comma hsonLexer
+
 identifier = do
   name <- P.identifier hsonLexer
   pos <- getPosition

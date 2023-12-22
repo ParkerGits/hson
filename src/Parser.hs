@@ -36,6 +36,8 @@ data Expr = BinaryExpr Binary
           | VariableExpr Variable
   deriving (Show)
 
+type Program = ([VarStmt], Expr)
+
 data Binary = Binary
                 { binLeft  :: Expr
                 , binOp    :: Token
@@ -85,7 +87,7 @@ newtype Variable = Variable { varName :: Token }
   deriving (Show)
 
 
-program :: HSONParser ([VarStmt], Expr)
+program :: HSONParser Program
 program = do
   declarations <- many varDecl
   expr <- expression
@@ -217,7 +219,7 @@ primary = do
 
 
 arguments :: HSONParser [Expr]
-arguments = sepBy1 expression (char ',')
+arguments = try $ sepBy1 expression comma <|> return []
 
 logicalOpParser :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
 logicalOpParser op = do

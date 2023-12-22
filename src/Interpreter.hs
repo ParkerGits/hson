@@ -2,7 +2,8 @@
 module Interpreter where
 import           Control.Monad.Except     (MonadError (throwError), runExceptT)
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader     (MonadReader, ReaderT (runReaderT))
+import           Control.Monad.Reader     (MonadReader, ReaderT (runReaderT),
+                                           ask, local)
 import           Data.Aeson.Encode.Pretty (NumberFormat (Scientific))
 import qualified Data.Map                 as Map
 import           Data.Scientific          (Scientific)
@@ -11,6 +12,14 @@ import           HSONValue
 import           Parser
 
 testEval exp = runExceptT $ runReaderT (unEval $ eval exp) Map.empty
+
+testInterpret prog = runExceptT $ runReaderT (unEval $ interpret prog) Map.empty
+
+interpret :: Program -> Eval HSONValue
+interpret ([], expr) = eval expr
+interpret ((VarStmt (Token _ (Just (String name)) _) initializer):stmts, expr) = do
+    val <- eval initializer
+    local (Map.insert name val) $ interpret (stmts, expr)
 
 eval :: Expr -> Eval HSONValue
 eval (BinaryExpr (Binary l opTok r)) = do
@@ -28,6 +37,17 @@ eval (BinaryExpr (Binary l opTok r)) = do
     Token TokenSlash _ _        -> numOp opTok (/) left right
     Token TokenPlus _ _         -> valuePlus opTok left right
     _                           -> throwError $ UnhandledOperator opTok
+
+eval (CallExpr (Call callee tok args)) = do
+  res <- eval callee
+  case res of
+    Function f   -> do
+      args <- mapM eval args
+      fn f args
+    Lambda f env -> do
+      args <- mapM eval args
+      local (const env) (fn f args)
+    _ -> throwError $ UncallableExpression tok
 
 eval (ConditionalExpr (Conditional cond matched unmatched)) = do
   condition <- eval cond
@@ -50,6 +70,12 @@ eval (UnaryExpr (Unary opTok r)) = do
   case opTok of
     Token TokenMinus _ _ -> minusValue opTok right
     Token TokenBang _ _  -> return $ Bool $ not $ isTruthy right
+
+eval (VariableExpr (Variable tok@(Token TokenIdentifier (Just (String s)) _))) = do
+  env <- ask
+  case Map.lookup s env of
+    Just value -> return value
+    Nothing    -> throwError $ UndefinedVariable tok
 
 valueEq :: HSONValue -> HSONValue -> Bool
 valueEq (String x) (String y) = x == y

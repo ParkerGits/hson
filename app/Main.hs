@@ -13,7 +13,7 @@ main = do
       Left err  -> print err
       Right val -> do
         print val
-        result <- testEval $ snd val
+        result <- testInterpret val
         case result of
           Left v  -> print v
           Right v -> print v

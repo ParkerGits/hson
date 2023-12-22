@@ -21,7 +21,7 @@ data HSONValue = Function Func
 instance Show HSONValue where
   show = T.unpack . showValue
 
-showValue:: HSONValue -> T.Text
+showValue :: HSONValue -> T.Text
 showValue (Function _) = "(native function)"
 showValue (Lambda _ _) = "(lambda function)"
 showValue (String s)   = T.concat ["\"", s, "\""]
@@ -46,12 +46,18 @@ newtype Eval a = Eval { unEval :: ReaderT Environment (ExceptT HSONError IO) a }
 
 data HSONError = UnhandledOperator Token
                | TypeError Token String
+               | UndefinedVariable Token
+               | UncallableExpression Token
 
 instance Show HSONError where
   show (UnhandledOperator (Token _ lit pos)) = case lit of
-    Just (String t) -> "Unhandled binary operator " <> T.unpack t <> " at " <> show pos <> "."
+    Just (String t) -> "Unhandled binary operator \"" <> T.unpack t <> "\" at " <> show pos <> "."
     Nothing         -> "Unhandled binary operator at " <> show pos <> "."
   show (TypeError (Token _ _ pos) s)                  = "Type error at " <> show pos <> ": " <> s <> "."
+  show (UndefinedVariable (Token _ (Just (String t)) pos)) = "Undefined variable \"" <> T.unpack t <> "\" at " <> show pos <> "."
+  show (UncallableExpression (Token _ lit pos)) = case lit of
+    Just (String t) -> "Uncallable expression \"" <> T.unpack t <> "\" at " <> show pos <> "."
+    Nothing         -> "Uncallable expression at " <> show pos <> "."
 
 data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull
   deriving (Show)
