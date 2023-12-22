@@ -12,7 +12,7 @@ main = do
     case v of
       Left err  -> print err
       Right val -> do
-        print val
+        -- print val
         result <- testInterpret val
         case result of
           Left v  -> print v

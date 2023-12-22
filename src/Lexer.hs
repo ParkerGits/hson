@@ -89,6 +89,12 @@ dot = P.dot hsonLexer
 
 comma = P.comma hsonLexer
 
+commaSep = P.commaSep hsonLexer
+
+brackets = P.brackets hsonLexer
+
+braces = P.braces hsonLexer
+
 identifier = do
   name <- P.identifier hsonLexer
   pos <- getPosition

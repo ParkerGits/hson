@@ -9,10 +9,13 @@ import           Control.Monad.Reader   (MonadReader, ReaderT)
 import qualified Data.Map               as Map
 import           Data.Scientific        (Scientific)
 import qualified Data.Text              as T
+import qualified Data.Vector            as V
 import           Text.Parsec            (SourcePos)
 
 data HSONValue = Function Func
                | Lambda Func Environment
+               | Array (V.Vector HSONValue)
+               | Object (Map.Map T.Text HSONValue)
                | String T.Text
                | Number Scientific
                | Bool Bool
@@ -24,13 +27,18 @@ instance Show HSONValue where
 showValue :: HSONValue -> T.Text
 showValue (Function _) = "(native function)"
 showValue (Lambda _ _) = "(lambda function)"
+showValue (Array v)    = T.concat ["[ ", T.intercalate ", " $ map showValue $ V.toList v, " ]"]
+showValue (Object o)   = T.concat ["{ ", T.intercalate ", " $ map showEntry $ Map.toList o, " }"]
 showValue (String s)   = T.concat ["\"", s, "\""]
 showValue (Number n)   = T.pack $ show n
 showValue (Bool True)  = "true"
 showValue (Bool False) = "false"
 showValue Null         = "null"
 
-type Environment =  Map.Map T.Text HSONValue
+showEntry :: (T.Text, HSONValue) -> T.Text
+showEntry (k, v) = k <> ": " <> showValue v
+
+type Environment = Map.Map T.Text HSONValue
 
 newtype Func = Func { fn :: [HSONValue] -> Eval HSONValue }
 
@@ -59,7 +67,7 @@ instance Show HSONError where
     Just (String t) -> "Uncallable expression \"" <> T.unpack t <> "\" at " <> show pos <> "."
     Nothing         -> "Uncallable expression at " <> show pos <> "."
 
-data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull
+data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftBrace | TokenLeftBracket | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull
   deriving (Show)
 
 data Token = Token

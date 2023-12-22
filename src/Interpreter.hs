@@ -8,6 +8,7 @@ import           Data.Aeson.Encode.Pretty (NumberFormat (Scientific))
 import qualified Data.Map                 as Map
 import           Data.Scientific          (Scientific)
 import qualified Data.Text                as T
+import qualified Data.Vector              as V
 import           HSONValue
 import           Parser
 
@@ -22,6 +23,10 @@ interpret ((VarStmt (Token _ (Just (String name)) _) initializer):stmts, expr) =
     local (Map.insert name val) $ interpret (stmts, expr)
 
 eval :: Expr -> Eval HSONValue
+eval (ArrayInitializerExpr (ArrayInitializer bracketTok elems)) = do
+  elements <- mapM eval elems
+  return $ Array $ V.fromList elements
+
 eval (BinaryExpr (Binary l opTok r)) = do
   left <- eval l
   right <- eval r
@@ -64,6 +69,10 @@ eval (LogicalExpr (Logical l opTok r)) = do
     Token TokenOrOr _ _   -> if isTruthy left then return left else return right
     Token TokenAndAnd _ _ -> if isTruthy left then return right else return left
     _                     -> throwError $ UnhandledOperator opTok
+
+eval (ObjectInitializerExpr (ObjectInitializer braceTok entries)) = do
+  evalEntries <- mapM evalEntry entries
+  return $ Object $ Map.fromList evalEntries
 
 eval (UnaryExpr (Unary opTok r)) = do
   right <- eval r
@@ -115,3 +124,8 @@ isTruthy Null       = False
 minusValue :: Token -> HSONValue -> Eval HSONValue
 minusValue _ (Number v) = return $ Number $ -1 * v
 minusValue opTok _      = throwError $ TypeError opTok "operand must be a number"
+
+evalEntry :: (Token, Expr) -> Eval (T.Text, HSONValue)
+evalEntry (Token _ (Just (String k)) _, exp) = do
+  v <- eval exp
+  return (k, v)

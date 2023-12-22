@@ -4,8 +4,10 @@ module Parser where
 
 import           Control.Monad.Identity        (Identity (runIdentity))
 import           Data.Function
+import qualified Data.Map                      as Map
 import           Data.Scientific               (Scientific, fromFloatDigits)
 import qualified Data.Text                     as T (Text, pack, unpack)
+import qualified Data.Vector                   as V
 import           HSONValue
 import           Lexer
 import           Text.Parsec                   (ParsecT, SourcePos, alphaNum,
@@ -17,7 +19,6 @@ import           Text.ParserCombinators.Parsec (chainl1, char, digit, eof,
                                                 getInput, many, runParser,
                                                 sepBy1, space, spaces, (<|>))
 
-
 data VarStmt = VarStmt
                  { declName    :: Token
                  , initializer :: Expr
@@ -25,18 +26,26 @@ data VarStmt = VarStmt
   deriving (Show)
 
 
-data Expr = BinaryExpr Binary
+data Expr = ArrayInitializerExpr ArrayInitializer
+          | BinaryExpr Binary
           | CallExpr Call
           | ConditionalExpr Conditional
           | GroupingExpr Grouping
           | GetExpr Get
           | LiteralExpr Literal
           | LogicalExpr Logical
+          | ObjectInitializerExpr ObjectInitializer
           | UnaryExpr Unary
           | VariableExpr Variable
   deriving (Show)
 
 type Program = ([VarStmt], Expr)
+
+data ArrayInitializer = ArrayInitializer
+                          { bracket  :: Token
+                          , elements :: [Expr]
+                          }
+  deriving (Show)
 
 data Binary = Binary
                 { binLeft  :: Expr
@@ -77,6 +86,13 @@ data Logical = Logical
                  , logiRight :: Expr
                  }
   deriving (Show)
+
+data ObjectInitializer = ObjectInitializer
+                           { brace   :: Token
+                           , entries :: [(Token, Expr)]
+                           }
+  deriving (Show)
+
 data Unary = Unary
                { unaryOp    :: Token
                , unaryRight :: Expr
@@ -189,7 +205,7 @@ call = do
 
 primary :: HSONParser Expr
 primary = do
-  try falseParser <|> try trueParser <|> try nullParser <|> try numberParser <|> try stringParser <|> try identParser <|> try groupingParser
+  try falseParser <|> try trueParser <|> try nullParser <|> try numberParser <|> try stringParser <|> try identParser <|> try groupingParser <|> try arrayParser <|> objectParser
     where
       falseParser = do
         tokenFalse
@@ -216,10 +232,27 @@ primary = do
       groupingParser = do
         expr <- parens expression
         return $ GroupingExpr Grouping {groupingExpr=expr}
-
+      arrayParser = do
+        bracketPos <- getPosition
+        elems <- brackets arguments
+        return $ ArrayInitializerExpr ArrayInitializer {bracket=Token {tokenType=TokenLeftBracket, literal=Nothing, pos=bracketPos}, elements=elems}
+      objectParser = do
+        bracePos <- getPosition
+        entries <- braces keyValues
+        return $ ObjectInitializerExpr ObjectInitializer {brace=Token {tokenType=TokenLeftBrace, literal=Nothing, pos=bracePos}, entries=entries}
 
 arguments :: HSONParser [Expr]
-arguments = try $ sepBy1 expression comma <|> return []
+arguments = commaSep expression
+
+keyValues :: HSONParser [(Token, Expr)]
+keyValues = do
+  commaSep keyValue
+    where
+      keyValue = do
+        k <- identifier
+        colon
+        v <- expression
+        return (k, v)
 
 logicalOpParser :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
 logicalOpParser op = do
