@@ -6,7 +6,7 @@ import           Control.Monad.Reader     (MonadReader, ReaderT (runReaderT),
                                            ask, local)
 import           Data.Aeson.Encode.Pretty (NumberFormat (Scientific))
 import qualified Data.Map                 as Map
-import           Data.Scientific          (Scientific)
+import           Data.Scientific          (Scientific, floatingOrInteger)
 import qualified Data.Text                as T
 import qualified Data.Vector              as V
 import           HSONValue
@@ -58,8 +58,22 @@ eval (ConditionalExpr (Conditional cond matched unmatched)) = do
   condition <- eval cond
   if isTruthy condition then eval matched else eval unmatched
 
+eval (GetExpr (Get expr propTok@(Token _ (Just (String name)) _))) = do
+  object <- eval expr
+  case object of
+    Object kv -> lookupObject propTok name kv
+    _         -> throwError $ UndefinedProperty propTok
+
 eval (GroupingExpr (Grouping expr)) = eval expr
 
+eval (IndexExpr (Index indexed tok index)) = do
+  object <- eval indexed
+  idx <- eval index
+  case object of
+    Object kv -> case idx of
+      String name -> lookupObject tok name kv
+      value       -> throwError $ InvalidIndex tok value "object"
+    Array arr -> lookupArray tok idx arr
 eval (LiteralExpr (Literal v)) = return v
 
 eval (LogicalExpr (Logical l opTok r)) = do
@@ -129,3 +143,17 @@ evalEntry :: (Token, Expr) -> Eval (T.Text, HSONValue)
 evalEntry (Token _ (Just (String k)) _, exp) = do
   v <- eval exp
   return (k, v)
+
+lookupObject :: Token -> T.Text -> Map.Map T.Text HSONValue -> Eval HSONValue
+lookupObject tok name kv = case Map.lookup name kv of
+      Just v  -> return v
+      Nothing -> throwError $ UndefinedProperty tok
+
+lookupArray :: Token -> HSONValue -> V.Vector HSONValue -> Eval HSONValue
+lookupArray tok idx arr = case idx of
+      Number n -> case floatingOrInteger n of
+        Right int -> case arr V.!? int of
+          Just v  -> return v
+          Nothing -> throwError $ IndexOutOfBounds tok int
+        Left float -> throwError $ InvalidIndex tok idx "array"
+      _ -> throwError $ InvalidIndex tok idx "array"

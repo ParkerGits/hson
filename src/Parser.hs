@@ -32,6 +32,7 @@ data Expr = ArrayInitializerExpr ArrayInitializer
           | ConditionalExpr Conditional
           | GroupingExpr Grouping
           | GetExpr Get
+          | IndexExpr Index
           | LiteralExpr Literal
           | LogicalExpr Logical
           | ObjectInitializerExpr ObjectInitializer
@@ -72,6 +73,15 @@ data Get = Get
              { object   :: Expr
              , property :: Token
              }
+  deriving (Show)
+
+data Index = Index
+               { -- The expression being indexed
+                 indexed          :: Expr
+               , openIndexBracket :: Token
+                 -- The index
+               , index            :: Expr
+               }
   deriving (Show)
 
 newtype Grouping = Grouping { groupingExpr :: Expr }
@@ -190,7 +200,7 @@ call :: HSONParser Expr
 call = do
   expr <- primary
   try (do
-    exprs <- many (try $ callParser <|> getParser)
+    exprs <- many (try $ callParser <|> try indexParser <|> getParser)
     return $ foldl (&) expr exprs
     ) <|> return expr
     where
@@ -198,6 +208,10 @@ call = do
         parenPos <- getPosition
         args <- parens arguments
         return $ \callee -> CallExpr Call {callee=callee, paren=Token {tokenType=TokenLeftParen, literal=Nothing, pos=parenPos}, args=args}
+      indexParser = do
+        bracketPos <- getPosition
+        idx <- brackets expression
+        return $ \indexed -> IndexExpr Index {openIndexBracket=Token {tokenType=TokenLeftBracket, literal=Nothing, pos=bracketPos}, indexed=indexed, index=idx}
       getParser = do
         dot
         property <- identifier

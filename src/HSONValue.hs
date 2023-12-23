@@ -7,7 +7,7 @@ import           Control.Monad.Except   (ExceptT, MonadError)
 import           Control.Monad.IO.Class (MonadIO)
 import           Control.Monad.Reader   (MonadReader, ReaderT)
 import qualified Data.Map               as Map
-import           Data.Scientific        (Scientific)
+import           Data.Scientific        (Scientific, floatingOrInteger)
 import qualified Data.Text              as T
 import qualified Data.Vector            as V
 import           Text.Parsec            (SourcePos)
@@ -30,7 +30,9 @@ showValue (Lambda _ _) = "(lambda function)"
 showValue (Array v)    = T.concat ["[ ", T.intercalate ", " $ map showValue $ V.toList v, " ]"]
 showValue (Object o)   = T.concat ["{ ", T.intercalate ", " $ map showEntry $ Map.toList o, " }"]
 showValue (String s)   = T.concat ["\"", s, "\""]
-showValue (Number n)   = T.pack $ show n
+showValue (Number n)   = case floatingOrInteger n of
+  Left float -> T.pack $ show float
+  Right int  -> T.pack $ show int
 showValue (Bool True)  = "true"
 showValue (Bool False) = "false"
 showValue Null         = "null"
@@ -53,19 +55,28 @@ newtype Eval a = Eval { unEval :: ReaderT Environment (ExceptT HSONError IO) a }
     )
 
 data HSONError = UnhandledOperator Token
-               | TypeError Token String
+               | TypeError Token T.Text
                | UndefinedVariable Token
                | UncallableExpression Token
+               | UndefinedProperty Token
+               | InvalidIndex Token HSONValue T.Text
+               | IndexOutOfBounds Token Int
 
 instance Show HSONError where
-  show (UnhandledOperator (Token _ lit pos)) = case lit of
-    Just (String t) -> "Unhandled binary operator \"" <> T.unpack t <> "\" at " <> show pos <> "."
-    Nothing         -> "Unhandled binary operator at " <> show pos <> "."
-  show (TypeError (Token _ _ pos) s)                  = "Type error at " <> show pos <> ": " <> s <> "."
-  show (UndefinedVariable (Token _ (Just (String t)) pos)) = "Undefined variable \"" <> T.unpack t <> "\" at " <> show pos <> "."
-  show (UncallableExpression (Token _ lit pos)) = case lit of
-    Just (String t) -> "Uncallable expression \"" <> T.unpack t <> "\" at " <> show pos <> "."
-    Nothing         -> "Uncallable expression at " <> show pos <> "."
+  show = T.unpack . showError
+
+showError :: HSONError -> T.Text
+showError (UnhandledOperator (Token _ lit pos)) = case lit of
+  Just (String t) -> T.concat ["Unhandled binary operator \"", t, "\" at ", T.pack $ show pos, "."]
+  Nothing         -> T.concat ["Unhandled binary operator at ", T.pack $ show pos, "."]
+showError (TypeError (Token _ _ pos) msg)                  = T.concat["Type error at ", T.pack $ show pos, ": ", msg, "."]
+showError (UndefinedVariable (Token _ (Just (String t)) pos)) = T.concat ["Undefined variable \"", t, "\" at ", T.pack $ show pos, "."]
+showError (UncallableExpression (Token _ lit pos)) = case lit of
+  Just (String t) -> T.concat ["Uncallable expression \"", t, "\" at ", T.pack $ show pos, "."]
+  Nothing         -> T.concat ["Uncallable expression at ", T.pack $ show pos, "."]
+showError (UndefinedProperty (Token _ (Just (String t)) pos)) = T.concat ["Property ", t, " does not exist at ", T.pack $ show pos, "."]
+showError (InvalidIndex (Token _ _ pos) val objType) = T.concat ["Cannot index ", objType, " with ", showValue val, " at ", T.pack $ show pos, "."]
+showError (IndexOutOfBounds (Token _ _ pos) idx) = T.concat ["Index ", T.pack $ show idx, " out of bounds at ", T.pack $ show pos, "."]
 
 data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftBrace | TokenLeftBracket | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull
   deriving (Show)
