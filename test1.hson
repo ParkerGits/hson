@@ -1,1 +1,3 @@
-let sweeties = ["parker", "raegan"]; sweeties[{hello: world}]
+let toonLaff = {scooter: 31, dave: 32};
+let toons = ["scooter", "dave"];
+toonLaff[toons[0]]
