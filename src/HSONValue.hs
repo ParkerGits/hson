@@ -13,6 +13,7 @@ import qualified Data.Vector            as V
 import           Text.Parsec            (SourcePos)
 
 data HSONValue = Function Func
+               | Method (HSONValue -> Func)
                | Lambda Func Environment
                | Array (V.Vector HSONValue)
                | Object (Map.Map T.Text HSONValue)
@@ -26,6 +27,7 @@ instance Show HSONValue where
 
 showValue :: HSONValue -> T.Text
 showValue (Function _) = "(native function)"
+showValue (Method _) = T.concat ["(bound function)"]
 showValue (Lambda _ _) = "(lambda function)"
 showValue (Array v)    = T.concat ["[ ", T.intercalate ", " $ map showValue $ V.toList v, " ]"]
 showValue (Object o)   = T.concat ["{ ", T.intercalate ", " $ map showEntry $ Map.toList o, " }"]
@@ -56,11 +58,13 @@ newtype Eval a = Eval { unEval :: ReaderT Environment (ExceptT HSONError IO) a }
 
 data HSONError = UnhandledOperator Token
                | TypeError Token T.Text
+               | UnexpectedType T.Text T.Text
                | UndefinedVariable Token
                | UncallableExpression Token
                | UndefinedProperty Token
                | InvalidIndex Token HSONValue T.Text
                | IndexOutOfBounds Token Int
+               | ArgumentCount Int [HSONValue]
 
 instance Show HSONError where
   show = T.unpack . showError
@@ -70,6 +74,7 @@ showError (UnhandledOperator (Token _ lit pos)) = case lit of
   Just (String t) -> T.concat ["Unhandled binary operator \"", t, "\" at ", T.pack $ show pos, "."]
   Nothing         -> T.concat ["Unhandled binary operator at ", T.pack $ show pos, "."]
 showError (TypeError (Token _ _ pos) msg)                  = T.concat["Type error at ", T.pack $ show pos, ": ", msg, "."]
+showError (UnexpectedType expected received) = T.concat ["expected ", expected, " received ", received, "."]
 showError (UndefinedVariable (Token _ (Just (String t)) pos)) = T.concat ["Undefined variable \"", t, "\" at ", T.pack $ show pos, "."]
 showError (UncallableExpression (Token _ lit pos)) = case lit of
   Just (String t) -> T.concat ["Uncallable expression \"", t, "\" at ", T.pack $ show pos, "."]
@@ -77,6 +82,7 @@ showError (UncallableExpression (Token _ lit pos)) = case lit of
 showError (UndefinedProperty (Token _ (Just (String t)) pos)) = T.concat ["Property ", t, " does not exist at ", T.pack $ show pos, "."]
 showError (InvalidIndex (Token _ _ pos) val objType) = T.concat ["Cannot index ", objType, " with ", showValue val, " at ", T.pack $ show pos, "."]
 showError (IndexOutOfBounds (Token _ _ pos) idx) = T.concat ["Index ", T.pack $ show idx, " out of bounds at ", T.pack $ show pos, "."]
+showError (ArgumentCount expected received) = T.concat ["expected ", T.pack $ show expected, " arguments, received [", T.intercalate ", " $ map showValue received, "]." ]
 
 data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftBrace | TokenLeftBracket | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull
   deriving (Show)

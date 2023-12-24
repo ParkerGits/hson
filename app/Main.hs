@@ -3,7 +3,6 @@ module Main where
 import           Control.Monad.IO.Class (MonadIO (liftIO))
 import           Data.Either            (fromLeft)
 import           Interpreter
-import qualified NativeFunction         (someFunc)
 import           Parser
 
 main = do

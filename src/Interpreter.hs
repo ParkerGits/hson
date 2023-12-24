@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Interpreter where
+import           Control.Exception        (throwIO)
 import           Control.Monad.Except     (MonadError (throwError), runExceptT)
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader     (MonadReader, ReaderT (runReaderT),
@@ -10,6 +11,7 @@ import           Data.Scientific          (Scientific, floatingOrInteger)
 import qualified Data.Text                as T
 import qualified Data.Vector              as V
 import           HSONValue
+import           Native                   (arrayMethods)
 import           Parser
 
 testEval exp = runExceptT $ runReaderT (unEval $ eval exp) Map.empty
@@ -23,9 +25,7 @@ interpret ((VarStmt (Token _ (Just (String name)) _) initializer):stmts, expr) =
     local (Map.insert name val) $ interpret (stmts, expr)
 
 eval :: Expr -> Eval HSONValue
-eval (ArrayInitializerExpr (ArrayInitializer bracketTok elems)) = do
-  elements <- mapM eval elems
-  return $ Array $ V.fromList elements
+eval (ArrayInitializerExpr (ArrayInitializer bracketTok elems)) = Array . V.fromList <$> mapM eval elems
 
 eval (BinaryExpr (Binary l opTok r)) = do
   left <- eval l
@@ -58,22 +58,14 @@ eval (ConditionalExpr (Conditional cond matched unmatched)) = do
   condition <- eval cond
   if isTruthy condition then eval matched else eval unmatched
 
-eval (GetExpr (Get expr propTok@(Token _ (Just (String name)) _))) = do
-  object <- eval expr
-  case object of
-    Object kv -> lookupObject propTok name kv
-    _         -> throwError $ UndefinedProperty propTok
+eval (GetExpr (Get expr tok@(Token _ (Just idx) _))) = eval expr >>= access tok idx
 
 eval (GroupingExpr (Grouping expr)) = eval expr
 
 eval (IndexExpr (Index indexed tok index)) = do
   object <- eval indexed
   idx <- eval index
-  case object of
-    Object kv -> case idx of
-      String name -> lookupObject tok name kv
-      value       -> throwError $ InvalidIndex tok value "object"
-    Array arr -> lookupArray tok idx arr
+  access tok idx object
 eval (LiteralExpr (Literal v)) = return v
 
 eval (LogicalExpr (Logical l opTok r)) = do
@@ -144,16 +136,28 @@ evalEntry (Token _ (Just (String k)) _, exp) = do
   v <- eval exp
   return (k, v)
 
-lookupObject :: Token -> T.Text -> Map.Map T.Text HSONValue -> Eval HSONValue
-lookupObject tok name kv = case Map.lookup name kv of
-      Just v  -> return v
-      Nothing -> throwError $ UndefinedProperty tok
+access :: Token -> HSONValue -> HSONValue -> Eval HSONValue
 
-lookupArray :: Token -> HSONValue -> V.Vector HSONValue -> Eval HSONValue
-lookupArray tok idx arr = case idx of
-      Number n -> case floatingOrInteger n of
-        Right int -> case arr V.!? int of
-          Just v  -> return v
-          Nothing -> throwError $ IndexOutOfBounds tok int
-        Left float -> throwError $ InvalidIndex tok idx "array"
-      _ -> throwError $ InvalidIndex tok idx "array"
+access tok (String name) (Object o) = accessObjectProp tok name o
+access tok value (Object o) = throwError $ InvalidIndex tok value "object"
+access tok value@(Number idx) (Array arr) = case floatingOrInteger idx of
+  Right int  -> accessArrayIdx tok int arr
+  Left float -> throwError $ InvalidIndex tok value "array"
+access tok (String name) (Array arr) = accessArrayMethod tok name arr
+access tok _ _ = throwError $ UndefinedProperty tok
+
+accessObjectProp :: Token -> T.Text -> Map.Map T.Text HSONValue -> Eval HSONValue
+accessObjectProp tok name kv = case Map.lookup name kv of
+      Just (Method f) -> return $ Function $ f (Object kv)
+      Just v          -> return v
+      Nothing         -> throwError $ UndefinedProperty tok
+
+accessArrayIdx :: Token -> Int -> V.Vector HSONValue -> Eval HSONValue
+accessArrayIdx tok idx arr = case arr V.!? idx of
+      Just v  -> return v
+      Nothing -> throwError $ IndexOutOfBounds tok idx
+
+accessArrayMethod :: Token -> T.Text -> V.Vector HSONValue -> Eval HSONValue
+accessArrayMethod tok name arr = case Map.lookup name arrayMethods of
+      Just (Method f) -> return $ Function $ f (Array arr)
+      Nothing         -> throwError $ UndefinedProperty tok
