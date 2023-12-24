@@ -28,6 +28,7 @@ data VarStmt = VarStmt
 
 
 data Expr = ArrayInitializerExpr ArrayInitializer
+          | ArrowFunctionExpr ArrowFunction
           | BinaryExpr Binary
           | CallExpr Call
           | ConditionalExpr Conditional
@@ -47,6 +48,12 @@ data ArrayInitializer = ArrayInitializer
                           { bracket  :: Token
                           , elements :: [Expr]
                           }
+  deriving (Show)
+
+data ArrowFunction = ArrowFunction
+                       { params :: [Token]
+                       , body   :: Expr
+                       }
   deriving (Show)
 
 data Binary = Binary
@@ -200,7 +207,7 @@ call = do
       threadl = foldl (&)
 
 primary :: HSONParser Expr
-primary = try parseNumber <|> try parseString <|> try parseTrue <|> try parseFalse <|> try parseNull <|> try parseIdent <|> try parseArray <|> try parseObject <|> try parseGrouping
+primary = try parseNumber <|> try parseString <|> try parseTrue <|> try parseFalse <|> try parseNull <|> try parseIdent <|> try parseArray <|> try parseObject <|> try parseGrouping <|> parseArrowFunction
 
 parseNumber :: HSONParser Expr
 parseNumber = do
@@ -254,8 +261,16 @@ parseIdent = VariableExpr . Variable <$> identifier
 parseGrouping :: HSONParser Expr
 parseGrouping = GroupingExpr . Grouping <$> parens expression
 
-parseLambda :: HSONParser Expr
-parseLambda = undefined
+parseArrowFunction :: HSONParser Expr
+parseArrowFunction = do
+  tokenBackslash
+  params <- parens parameters
+  tokenArrow
+  body <- expression
+  return $ ArrowFunctionExpr ArrowFunction {params=params, body=body}
+
+parameters :: HSONParser [Token]
+parameters = commaSep identifier
 
 arguments :: HSONParser [Expr]
 arguments = commaSep expression

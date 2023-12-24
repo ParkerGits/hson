@@ -86,7 +86,7 @@ showError (IndexOutOfBounds (Token _ _ pos) idx) = T.concat ["Index ", T.pack $ 
 showError (ArgumentCount expected received) = T.concat ["expected ", T.pack $ show expected, " arguments, received args [", T.intercalate ", " $ map showValue received, "]" ]
 showError (CallError (Token _ _ pos) err) = T.concat ["Call error at ", T.pack $ show pos, ": ", showError err, "."]
 
-data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftBrace | TokenLeftBracket | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull | TokenBackslash | TokenUnderscore
+data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftBrace | TokenLeftBracket | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull | TokenBackslash | TokenArrow
   deriving (Show)
 
 data Token = Token

@@ -16,7 +16,7 @@ import qualified Text.Parsec.Token          as P
 
 hsonStyle :: P.GenLanguageDef T.Text () Identity
 hsonStyle = P.LanguageDef {
-  P.reservedOpNames=["&&", "||", "==", "!", "!=", ">", ">=", "<", "<=", "-", "+", "/", "*", "?", ":"], P.reservedNames=["$", "true", "false", "let", "null"], P.opStart=P.opLetter hsonStyle, P.opLetter=oneOf "!&*+/<=>?:\\|-", P.nestedComments=True, P.identStart=letter <|> char '_', P.identLetter=alphaNum <|> oneOf "_'", P.commentStart="/*", P.commentLine="//", P.commentEnd="*/", P.caseSensitive=True
+  P.reservedOpNames=["&&", "||", "==", "!", "!=", ">", ">=", "<", "<=", "-", "+", "/", "*", "?", ":", "=>", "\\"], P.reservedNames=["$", "true", "false", "let", "null"], P.opStart=P.opLetter hsonStyle, P.opLetter=oneOf "!&*+/<=>?:\\|-", P.nestedComments=True, P.identStart=letter <|> char '_', P.identLetter=alphaNum <|> oneOf "_'", P.commentStart="/*", P.commentLine="//", P.commentEnd="*/", P.caseSensitive=True
   }
 
 hsonLexer :: P.GenTokenParser T.Text () Identity
@@ -79,9 +79,9 @@ tokenFalse = tokenReserved TokenFalse "false"
 
 tokenNull = tokenReserved TokenNull "null"
 
-tokenBackslash = tokenReserved TokenBackslash "\\"
+tokenBackslash = tokenReservedOp TokenBackslash "\\"
 
-tokenUnderscore = tokenReserved TokenUnderscore "_"
+tokenArrow = tokenReservedOp TokenArrow "=>"
 
 parens = P.parens hsonLexer
 
@@ -94,6 +94,8 @@ dot = P.dot hsonLexer
 comma = P.comma hsonLexer
 
 commaSep = P.commaSep hsonLexer
+
+commaSep1 = P.commaSep1 hsonLexer
 
 brackets = P.brackets hsonLexer
 

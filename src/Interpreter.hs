@@ -1,17 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Interpreter where
-import           Control.Exception      (throwIO)
-import           Control.Monad.Except   (MonadError (throwError), catchError,
-                                         runExceptT)
+import           Control.Exception          (throwIO)
+import           Control.Monad.Except       (MonadError (throwError),
+                                             catchError, runExceptT)
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader   (MonadReader, ReaderT (runReaderT), ask,
-                                         local)
-import qualified Data.Map               as Map
-import           Data.Scientific        (Scientific, floatingOrInteger)
-import qualified Data.Text              as T
-import qualified Data.Vector            as V
+import           Control.Monad.Reader       (MonadReader, ReaderT (runReaderT),
+                                             ask, local)
+import           Control.Monad.Reader.Class
+import qualified Data.Map                   as Map
+import           Data.Maybe
+import           Data.Scientific            (Scientific, floatingOrInteger)
+import qualified Data.Text                  as T
+import qualified Data.Vector                as V
 import           HSONValue
-import           Native                 (arrayMethods)
+import           Native                     (arrayMethods)
 import           Parser
 
 testEval exp = runExceptT $ runReaderT (unEval $ eval exp) Map.empty
@@ -25,6 +27,8 @@ interpret ((VarStmt (Token _ (Just (String name)) _) initializer):stmts, expr) =
     local (Map.insert name val) $ interpret (stmts, expr)
 
 eval :: Expr -> Eval HSONValue
+eval (ArrowFunctionExpr (ArrowFunction params body)) = asks $ Lambda (Func $ applyLambda body params)
+
 eval (ArrayInitializerExpr (ArrayInitializer bracketTok elems)) = Array . V.fromList <$> mapM eval elems
 
 eval (BinaryExpr (Binary l opTok r)) = do
@@ -48,10 +52,10 @@ eval (CallExpr (Call callee tok args)) = do
   case res of
     Function f   -> do
       args <- mapM eval args
-      (fn f args) `catchError` (throwError . CallError tok)
+      fn f args `catchError` (throwError . CallError tok)
     Lambda f env -> do
       args <- mapM eval args
-      local (const env) (fn f args)
+      local (const env) $ fn f args
     _ -> throwError $ UncallableExpression tok
 
 eval (ConditionalExpr (Conditional cond matched unmatched)) = do
@@ -136,8 +140,19 @@ evalEntry (Token _ (Just (String k)) _, exp) = do
   v <- eval exp
   return (k, v)
 
-access :: Token -> HSONValue -> HSONValue -> Eval HSONValue
+applyLambda :: Expr -> [Token] -> [HSONValue] -> Eval HSONValue
+applyLambda expr params args
+  | length params /= length args = throwError $ ArgumentCount (length params) args
+  | otherwise = do
+    closureEnv <- ask
+    let params' = map toIdent params
+        env = Map.fromList (zip params' args) <> closureEnv in
+          local (const env) $ eval expr
 
+toIdent :: Token -> T.Text
+toIdent (Token _ (Just (String t)) _) = t
+
+access :: Token -> HSONValue -> HSONValue -> Eval HSONValue
 access tok (String name) (Object o) = accessObjectProp tok name o
 access tok value (Object o) = throwError $ InvalidIndex tok value "object"
 access tok value@(Number idx) (Array arr) = case floatingOrInteger idx of
