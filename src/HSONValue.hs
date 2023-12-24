@@ -29,7 +29,7 @@ showValue :: HSONValue -> T.Text
 showValue (Function _) = "(native function)"
 showValue (Method _) = "(bound function)"
 showValue (Lambda _ _) = "(lambda function)"
-showValue (Array v)    = T.concat ["[ ", T.intercalate ", " $ map showValue $ V.toList v, " ]"]
+showValue (Array v)    = T.concat ["[", T.intercalate ", " $ map showValue $ V.toList v, "]"]
 showValue (Object o)   = T.concat ["{ ", T.intercalate ", " $ map showEntry $ Map.toList o, " }"]
 showValue (String s)   = T.concat ["\"", s, "\""]
 showValue (Number n)   = case floatingOrInteger n of

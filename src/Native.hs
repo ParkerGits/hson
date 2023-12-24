@@ -3,6 +3,7 @@
 module Native where
 import           Control.Monad.Except
 import           Control.Monad.Reader (asks)
+import           Data.List
 import qualified Data.Map             as Map
 import           Data.Scientific
 import qualified Data.Text            as T
@@ -13,7 +14,7 @@ mkMethod :: (HSONValue -> [HSONValue] -> Eval HSONValue) -> HSONValue
 mkMethod f = Method (Func . f)
 
 arrayMethods :: Map.Map T.Text HSONValue
-arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt)]
+arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap)]
 
 hsonLength :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonLength this [] = do
@@ -30,9 +31,18 @@ hsonAt this [Number n] =
       Array arr -> case arr V.!? idx of
         Just v  -> return v
         Nothing -> return Null
+hsonAt _ [arg] = throwError $ UnexpectedType "number" (showType arg)
+hsonAt _ args = throwError $ ArgumentCount 1 args
+
+hsonMap :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonMap this [Lambda (Func f) env] =
+  case this of
+    Array arr -> Array <$> V.mapM (f . singleton) arr
+hsonMap _ [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonMap _ args  = throwError $ ArgumentCount 1 args
 
 showType :: HSONValue -> T.Text
-showType (Lambda _ _) = "function"
+showType (Lambda _ _) = "lambda"
 showType (Array _)    = "array"
 showType (Object _)   = "object"
 showType (String _)   = "string"
