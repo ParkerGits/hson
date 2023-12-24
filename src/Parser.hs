@@ -4,6 +4,7 @@ module Parser where
 
 import           Control.Monad.Identity        (Identity (runIdentity))
 import           Data.Function
+import           Data.Functor
 import qualified Data.Map                      as Map
 import           Data.Scientific               (Scientific, fromFloatDigits)
 import qualified Data.Text                     as T (Text, pack, unpack)
@@ -140,123 +141,136 @@ ternary = do
     matched <- expression
     colon
     unmatched <- expression
-    return $ ConditionalExpr Conditional {condition=expr, matched=matched, unmatched=unmatched})
-    <|> return expr
+    return $ ConditionalExpr Conditional {condition=expr, matched=matched, unmatched=unmatched}
+    ) <|> return expr
 
 
 logicOr :: HSONParser Expr
 logicOr = do
-  chainl1 logicAnd orParser
+  chainl1 logicAnd parseOr
     where
-      orParser = logicalOpParser orOr
+      parseOr = parseLogicalOp orOr
 
 logicAnd :: HSONParser Expr
 logicAnd = do
-  chainl1 equality andParser
+  chainl1 equality parseAnd
     where
-      andParser = logicalOpParser andAnd
+      parseAnd = parseLogicalOp andAnd
 
 equality :: HSONParser Expr
 equality = do
-  chainl1 comparison (try neqParser <|> eqParser)
+  chainl1 comparison (try parseNeq <|> parseEq)
     where
-      eqParser  = binOpParser equalEqual
-      neqParser = binOpParser bangEqual
+      parseEq  = parseBinaryOp equalEqual
+      parseNeq = parseBinaryOp bangEqual
 
 comparison :: HSONParser Expr
 comparison = do
-  chainl1 term (try gteParser <|> try gtParser <|> try lteParser <|> ltParser)
+  chainl1 term (try parseGte <|> try parseGt <|> try parseLte <|> parseLt)
   where
-    gtParser = binOpParser greater
-    gteParser = binOpParser greaterEqual
-    ltParser = binOpParser less
-    lteParser = binOpParser lessEqual
+    parseGt = parseBinaryOp greater
+    parseGte = parseBinaryOp greaterEqual
+    parseLt = parseBinaryOp less
+    parseLte = parseBinaryOp lessEqual
 
 term :: HSONParser Expr
 term = do
-  chainl1 factor (try plusParser <|> minusParser)
+  chainl1 factor (try parsePlus <|> parseMinus)
     where
-      minusParser  = binOpParser minus
-      plusParser = binOpParser plus
+      parseMinus  = parseBinaryOp minus
+      parsePlus = parseBinaryOp plus
 
 factor :: HSONParser Expr
 factor = do
-  chainl1 unary (try divParser <|> multParser)
+  chainl1 unary (try parseDiv <|> parseMult)
     where
-      multParser  = binOpParser star
-      divParser = binOpParser slash
+      parseMult  = parseBinaryOp star
+      parseDiv = parseBinaryOp slash
 
 unary :: HSONParser Expr
-unary = do
-    try unaryParser <|> call
-    where
-      unaryParser = do
-        op <- try bangParser <|> minusParser
-        op <$> unary
-      bangParser = unaryOpParser bang
-      minusParser = unaryOpParser minus
+unary = try parseUnary <|> call
 
 call :: HSONParser Expr
 call = do
   expr <- primary
-  try (do
-    exprs <- many (try $ callParser <|> try indexParser <|> getParser)
-    return $ foldl (&) expr exprs
-    ) <|> return expr
+  try (threadl expr <$> many (try $ parseCall <|> try parseIndex <|> parseGet)) <|> return expr
     where
-      callParser = do
-        parenPos <- getPosition
-        args <- parens arguments
-        return $ \callee -> CallExpr Call {callee=callee, paren=Token {tokenType=TokenLeftParen, literal=Nothing, pos=parenPos}, args=args}
-      indexParser = do
-        bracketPos <- getPosition
-        idx <- brackets expression
-        return $ \indexed -> IndexExpr Index {openIndexBracket=Token {tokenType=TokenLeftBracket, literal=Nothing, pos=bracketPos}, indexed=indexed, index=idx}
-      getParser = do
-        dot
-        property <- identifier
-        return $ \object -> GetExpr Get {object=object, property=property}
+      -- the parsed expression becomes the callee/indexed/object for the next call/index/get expression
+      -- so we apply expr to each function from left to right
+      threadl = foldl (&)
 
 primary :: HSONParser Expr
-primary = do
-  try falseParser <|> try trueParser <|> try nullParser <|> try numberParser <|> try stringParser <|> try identParser <|> try groupingParser <|> try arrayParser <|> objectParser
+primary = try parseNumber <|> try parseString <|> try parseTrue <|> try parseFalse <|> try parseNull <|> try parseIdent <|> try parseArray <|> try parseObject <|> try parseGrouping
+
+parseNumber :: HSONParser Expr
+parseNumber = do
+  n <- numberLiteral
+  return $ LiteralExpr Literal {value=Number $ toScientific n}
     where
-      falseParser = do
-        tokenFalse
-        return $ LiteralExpr Literal {value=Bool False}
-      trueParser = do
-        tokenTrue
-        return $ LiteralExpr Literal {value=Bool True}
-      nullParser = do
-        tokenNull
-        return $ LiteralExpr Literal {value=Null}
-      numberParser = do
-        n <- numberLiteral
-        return $ LiteralExpr Literal {value=Number $ toScientific n}
-          where
-            toScientific n = case n of
-              Right d -> fromFloatDigits d
-              Left i  -> fromInteger i
-      stringParser = do
-        str <- stringLiteral
-        return $ LiteralExpr Literal {value=String $ T.pack str}
-      identParser = do
-        varName <- identifier
-        return $ VariableExpr Variable {varName=varName}
-      groupingParser = do
-        expr <- parens expression
-        return $ GroupingExpr Grouping {groupingExpr=expr}
-      arrayParser = do
-        bracketPos <- getPosition
-        elems <- brackets arguments
-        return $ ArrayInitializerExpr ArrayInitializer {bracket=Token {tokenType=TokenLeftBracket, literal=Nothing, pos=bracketPos}, elements=elems}
-      objectParser = do
-        bracePos <- getPosition
-        entries <- braces keyValues
-        return $ ObjectInitializerExpr ObjectInitializer {brace=Token {tokenType=TokenLeftBrace, literal=Nothing, pos=bracePos}, entries=entries}
+      toScientific n = case n of
+        Right d -> fromFloatDigits d
+        Left i  -> fromInteger i
+
+parseUnary :: HSONParser Expr
+-- Parse a unary operation, then apply it to the next unary expression
+parseUnary = (try parseBang <|> parseMinus) <*> unary
+  where
+    parseBang = parseUnaryOp bang
+    parseMinus = parseUnaryOp minus
+
+parseCall :: HSONParser (Expr -> Expr)
+parseCall = do
+  parenPos <- getPosition
+  args <- parens arguments
+  return $ \callee -> CallExpr Call {callee=callee, paren=Token {tokenType=TokenLeftParen, literal=Nothing, pos=parenPos}, args=args}
+
+parseIndex :: HSONParser (Expr -> Expr)
+parseIndex = do
+  bracketPos <- getPosition
+  idx <- brackets expression
+  return $ \indexed -> IndexExpr Index {openIndexBracket=Token {tokenType=TokenLeftBracket, literal=Nothing, pos=bracketPos}, indexed=indexed, index=idx}
+
+parseGet :: HSONParser (Expr -> Expr)
+parseGet = do
+  dot
+  property <- identifier
+  return $ \object -> GetExpr Get {object=object, property=property}
+
+parseString :: HSONParser Expr
+parseString = LiteralExpr . Literal . String . T.pack <$> stringLiteral
+
+parseFalse :: HSONParser Expr
+parseFalse = tokenFalse $> LiteralExpr Literal {value=Bool False}
+
+parseTrue :: HSONParser Expr
+parseTrue = tokenTrue $> LiteralExpr Literal {value=Bool True}
+
+parseNull :: HSONParser Expr
+parseNull = tokenNull $> LiteralExpr Literal {value=Null}
+
+parseIdent :: HSONParser Expr
+parseIdent = VariableExpr . Variable <$> identifier
+
+parseGrouping :: HSONParser Expr
+parseGrouping = GroupingExpr . Grouping <$> parens expression
+
+parseLambda :: HSONParser Expr
+parseLambda = undefined
 
 arguments :: HSONParser [Expr]
 arguments = commaSep expression
+
+parseArray :: HSONParser Expr
+parseArray = do
+  bracketPos <- getPosition
+  elems <- brackets arguments
+  return $ ArrayInitializerExpr ArrayInitializer {bracket=Token {tokenType=TokenLeftBracket, literal=Nothing, pos=bracketPos}, elements=elems}
+
+parseObject :: HSONParser Expr
+parseObject = do
+  bracePos <- getPosition
+  entries <- braces keyValues
+  return $ ObjectInitializerExpr ObjectInitializer {brace=Token {tokenType=TokenLeftBrace, literal=Nothing, pos=bracePos}, entries=entries}
 
 keyValues :: HSONParser [(Token, Expr)]
 keyValues = do
@@ -268,20 +282,20 @@ keyValues = do
         v <- expression
         return (k, v)
 
-logicalOpParser :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
-logicalOpParser op = do
+parseLogicalOp :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
+parseLogicalOp op = do
         logiOp <- op
         pos <- getPosition
         return (\l r -> LogicalExpr Logical {logiLeft=l, logiOp=logiOp, logiRight=r})
 
-binOpParser :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
-binOpParser op = do
+parseBinaryOp :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
+parseBinaryOp op = do
         binOp <- op
         pos <- getPosition
         return (\l r -> BinaryExpr Binary {binLeft=l, binOp=binOp, binRight=r})
 
-unaryOpParser :: HSONParser Token -> HSONParser (Expr -> Expr)
-unaryOpParser op = do
+parseUnaryOp :: HSONParser Token -> HSONParser (Expr -> Expr)
+parseUnaryOp op = do
       unaryOp <- op
       pos <- getPosition
       return (\r -> UnaryExpr Unary {unaryOp=unaryOp, unaryRight=r})

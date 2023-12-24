@@ -79,6 +79,10 @@ tokenFalse = tokenReserved TokenFalse "false"
 
 tokenNull = tokenReserved TokenNull "null"
 
+tokenBackslash = tokenReserved TokenBackslash "\\"
+
+tokenUnderscore = tokenReserved TokenUnderscore "_"
+
 parens = P.parens hsonLexer
 
 numberLiteral = P.naturalOrFloat hsonLexer
