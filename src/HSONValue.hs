@@ -65,6 +65,7 @@ data HSONError = UnhandledOperator Token
                | InvalidIndex Token HSONValue T.Text
                | IndexOutOfBounds Token Int
                | ArgumentCount Int [HSONValue]
+               | CallError Token HSONError
 
 instance Show HSONError where
   show = T.unpack . showError
@@ -74,7 +75,7 @@ showError (UnhandledOperator (Token _ lit pos)) = case lit of
   Just (String t) -> T.concat ["Unhandled binary operator \"", t, "\" at ", T.pack $ show pos, "."]
   Nothing         -> T.concat ["Unhandled binary operator at ", T.pack $ show pos, "."]
 showError (TypeError (Token _ _ pos) msg)                  = T.concat["Type error at ", T.pack $ show pos, ": ", msg, "."]
-showError (UnexpectedType expected received) = T.concat ["expected ", expected, " received ", received, "."]
+showError (UnexpectedType expected received) = T.concat ["expected ", expected, " received ", received]
 showError (UndefinedVariable (Token _ (Just (String t)) pos)) = T.concat ["Undefined variable \"", t, "\" at ", T.pack $ show pos, "."]
 showError (UncallableExpression (Token _ lit pos)) = case lit of
   Just (String t) -> T.concat ["Uncallable expression \"", t, "\" at ", T.pack $ show pos, "."]
@@ -82,7 +83,8 @@ showError (UncallableExpression (Token _ lit pos)) = case lit of
 showError (UndefinedProperty (Token _ (Just (String t)) pos)) = T.concat ["Property ", t, " does not exist at ", T.pack $ show pos, "."]
 showError (InvalidIndex (Token _ _ pos) val objType) = T.concat ["Cannot index ", objType, " with ", showValue val, " at ", T.pack $ show pos, "."]
 showError (IndexOutOfBounds (Token _ _ pos) idx) = T.concat ["Index ", T.pack $ show idx, " out of bounds at ", T.pack $ show pos, "."]
-showError (ArgumentCount expected received) = T.concat ["expected ", T.pack $ show expected, " arguments, received [", T.intercalate ", " $ map showValue received, "]." ]
+showError (ArgumentCount expected received) = T.concat ["expected ", T.pack $ show expected, " arguments, received args [", T.intercalate ", " $ map showValue received, "]" ]
+showError (CallError (Token _ _ pos) err) = T.concat ["Call error at ", T.pack $ show pos, ": ", showError err, "."]
 
 data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftBrace | TokenLeftBracket | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull
   deriving (Show)

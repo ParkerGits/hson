@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Interpreter where
-import           Control.Exception        (throwIO)
-import           Control.Monad.Except     (MonadError (throwError), runExceptT)
+import           Control.Exception      (throwIO)
+import           Control.Monad.Except   (MonadError (throwError), catchError,
+                                         runExceptT)
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader     (MonadReader, ReaderT (runReaderT),
-                                           ask, local)
-import           Data.Aeson.Encode.Pretty (NumberFormat (Scientific))
-import qualified Data.Map                 as Map
-import           Data.Scientific          (Scientific, floatingOrInteger)
-import qualified Data.Text                as T
-import qualified Data.Vector              as V
+import           Control.Monad.Reader   (MonadReader, ReaderT (runReaderT), ask,
+                                         local)
+import qualified Data.Map               as Map
+import           Data.Scientific        (Scientific, floatingOrInteger)
+import qualified Data.Text              as T
+import qualified Data.Vector            as V
 import           HSONValue
-import           Native                   (arrayMethods)
+import           Native                 (arrayMethods)
 import           Parser
 
 testEval exp = runExceptT $ runReaderT (unEval $ eval exp) Map.empty
@@ -48,7 +48,7 @@ eval (CallExpr (Call callee tok args)) = do
   case res of
     Function f   -> do
       args <- mapM eval args
-      fn f args
+      (fn f args) `catchError` (throwError . CallError tok)
     Lambda f env -> do
       args <- mapM eval args
       local (const env) (fn f args)
