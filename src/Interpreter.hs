@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Interpreter where
-import           Control.Exception          (throwIO)
 import           Control.Monad.Except       (MonadError (throwError),
                                              catchError, runExceptT)
 import           Control.Monad.IO.Class
@@ -13,7 +12,7 @@ import           Data.Scientific            (Scientific, floatingOrInteger)
 import qualified Data.Text                  as T
 import qualified Data.Vector                as V
 import           HSONValue
-import           Native                     (arrayMethods)
+import           Native                     (arrayMethods, isTruthy)
 import           Parser
 
 runInterpretWithJSON :: HSONValue -> Program -> IO (Either HSONError HSONValue)
@@ -32,7 +31,7 @@ interpret ((VarStmt (Token _ (Just (String name)) _) initializer):stmts, expr) =
     local (Map.insert name val) $ interpret (stmts, expr)
 
 eval :: Expr -> Eval HSONValue
-eval (ArrowFunctionExpr (ArrowFunction params body)) = asks $ Lambda (Func $ applyLambda body params)
+eval (ArrowFunctionExpr (ArrowFunction params body)) = toLambda params body
 
 eval (ArrayInitializerExpr (ArrayInitializer bracketTok elems)) = Array . V.fromList <$> mapM eval elems
 
@@ -60,7 +59,7 @@ eval (CallExpr (Call callee tok args)) = do
       fn f args `catchError` (throwError . CallError tok)
     Lambda f env -> do
       args <- mapM eval args
-      local (const env) $ fn f args
+      local (const env) $ fn f args `catchError` (throwError . CallError tok)
     _ -> throwError $ UncallableExpression tok
 
 eval (ConditionalExpr (Conditional cond matched unmatched)) = do
@@ -136,12 +135,6 @@ numOp opTok _ x (Number y)         = throwError $ TypeError opTok "left operand 
 numOp opTok _ (Number x) y         = throwError $ TypeError opTok "right operand must be a number"
 numOp opTok _ _ _                  = throwError $ TypeError opTok  "operands must be numbers"
 
-isTruthy :: HSONValue -> Bool
-isTruthy (Number v) = v /= 0
-isTruthy (String v) = not $ T.null v
-isTruthy (Bool v)   = v
-isTruthy Null       = False
-
 minusValue :: Token -> HSONValue -> Eval HSONValue
 minusValue _ (Number v) = return $ Number $ -1 * v
 minusValue opTok _      = throwError $ TypeError opTok "operand must be a number"
@@ -151,14 +144,16 @@ evalEntry (Token _ (Just (String k)) _, exp) = do
   v <- eval exp
   return (k, v)
 
-applyLambda :: Expr -> [Token] -> [HSONValue] -> Eval HSONValue
-applyLambda expr params args
+toLambda :: [Token] -> Expr -> Eval HSONValue
+toLambda params expr = asks (Lambda . Func $ \args -> toLambda' params expr args)
+
+toLambda' :: [Token] -> Expr -> [HSONValue] -> Eval HSONValue
+toLambda' params expr args
   | length params /= length args = throwError $ ArgumentCount (length params) args
   | otherwise = do
-    closureEnv <- ask
-    let params' = map toIdent params
-        env = Map.fromList (zip params' args) <> closureEnv in
-          local (const env) $ eval expr
+      let params' = map toIdent params
+          env = Map.fromList (zip params' args) in
+            local (Map.union env) $ eval expr
 
 toIdent :: Token -> T.Text
 toIdent (Token _ (Just (String t)) _) = t
