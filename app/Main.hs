@@ -1,18 +1,14 @@
 module Main where
 
-import           Control.Monad.IO.Class (MonadIO (liftIO))
-import           Data.Either            (fromLeft)
+import           Data.Maybe
 import           Interpreter
-import           Parser
+import           IO          (readHSON, readJSON, run)
+import           JSONParser  (decode)
+import           Opts        (HSONInput (CmdLineIn, HSONFileInput),
+                              Options (Options, hsonInput, jsonInput), testOpts)
 
 main = do
-  str <- getContents
-  let v = test str in
-    case v of
-      Left err  -> print err
-      Right val -> do
-        -- print val
-        result <- testInterpret val
-        case result of
-          Left v  -> print v
-          Right v -> print v
+  opts <- testOpts
+  hsonIn <- readHSON $ hsonInput opts
+  jsonIn <- readJSON $ jsonInput opts
+  run jsonIn hsonIn

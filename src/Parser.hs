@@ -32,6 +32,7 @@ data Expr = ArrayInitializerExpr ArrayInitializer
           | BinaryExpr Binary
           | CallExpr Call
           | ConditionalExpr Conditional
+          | DollarExpr Dollar
           | GroupingExpr Grouping
           | GetExpr Get
           | IndexExpr Index
@@ -75,6 +76,9 @@ data Conditional = Conditional
                      , matched   :: Expr
                      , unmatched :: Expr
                      }
+  deriving (Show)
+
+newtype Dollar = Dollar { dollarTok :: Token }
   deriving (Show)
 
 data Get = Get
@@ -207,16 +211,7 @@ call = do
       threadl = foldl (&)
 
 primary :: HSONParser Expr
-primary = try parseNumber <|> try parseString <|> try parseTrue <|> try parseFalse <|> try parseNull <|> try parseIdent <|> try parseArray <|> try parseObject <|> try parseGrouping <|> parseArrowFunction
-
-parseNumber :: HSONParser Expr
-parseNumber = do
-  n <- numberLiteral
-  return $ LiteralExpr Literal {value=Number $ toScientific n}
-    where
-      toScientific n = case n of
-        Right d -> fromFloatDigits d
-        Left i  -> fromInteger i
+primary = try parseNumber <|> try parseString <|> try parseDollar <|> try parseTrue <|> try parseFalse <|> try parseNull <|> try parseIdent <|> try parseArray <|> try parseObject <|> try parseGrouping <|> parseArrowFunction
 
 parseUnary :: HSONParser Expr
 -- Parse a unary operation, then apply it to the next unary expression
@@ -243,8 +238,20 @@ parseGet = do
   property <- identifier
   return $ \object -> GetExpr Get {object=object, property=property}
 
+parseNumber :: HSONParser Expr
+parseNumber = do
+  n <- numberLiteral
+  return $ LiteralExpr Literal {value=Number $ toScientific n}
+    where
+      toScientific n = case n of
+        Right d -> fromFloatDigits d
+        Left i  -> fromInteger i
+
 parseString :: HSONParser Expr
 parseString = LiteralExpr . Literal . String . T.pack <$> stringLiteral
+
+parseDollar :: HSONParser Expr
+parseDollar = DollarExpr . Dollar <$> tokenDollar
 
 parseFalse :: HSONParser Expr
 parseFalse = tokenFalse $> LiteralExpr Literal {value=Bool False}
@@ -315,4 +322,4 @@ parseUnaryOp op = do
       pos <- getPosition
       return (\r -> UnaryExpr Unary {unaryOp=unaryOp, unaryRight=r})
 
-test s = runIdentity $ runParserT program () "" (T.pack s)
+parseHSON s = runIdentity $ runParserT program () "" s

@@ -16,9 +16,14 @@ import           HSONValue
 import           Native                     (arrayMethods)
 import           Parser
 
-testEval exp = runExceptT $ runReaderT (unEval $ eval exp) Map.empty
+runInterpretWithJSON :: HSONValue -> Program -> IO (Either HSONError HSONValue)
+runInterpretWithJSON json = runInterpret (Map.singleton "$" json)
 
-testInterpret prog = runExceptT $ runReaderT (unEval $ interpret prog) Map.empty
+runInterpretNoJSON :: Program -> IO (Either HSONError HSONValue)
+runInterpretNoJSON = runInterpret (Map.singleton "$" Null)
+
+runInterpret :: Environment -> Program -> IO (Either HSONError HSONValue)
+runInterpret env prog = runExceptT $ runReaderT (unEval $ interpret prog) env
 
 interpret :: Program -> Eval HSONValue
 interpret ([], expr) = eval expr
@@ -61,6 +66,12 @@ eval (CallExpr (Call callee tok args)) = do
 eval (ConditionalExpr (Conditional cond matched unmatched)) = do
   condition <- eval cond
   if isTruthy condition then eval matched else eval unmatched
+
+eval (DollarExpr (Dollar tok)) = do
+  jsonVar <- asks (Map.lookup "$")
+  case jsonVar of
+    Just json -> return json
+    Nothing   -> throwError $ UndefinedVariable tok
 
 eval (GetExpr (Get expr tok@(Token _ (Just idx) _))) = eval expr >>= access tok idx
 

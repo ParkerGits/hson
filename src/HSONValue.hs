@@ -66,6 +66,7 @@ data HSONError = UnhandledOperator Token
                | IndexOutOfBounds Token Int
                | ArgumentCount Int [HSONValue]
                | CallError Token HSONError
+               | JSONParsingError T.Text
 
 instance Show HSONError where
   show = T.unpack . showError
@@ -85,8 +86,9 @@ showError (InvalidIndex (Token _ _ pos) val objType) = T.concat ["Cannot index "
 showError (IndexOutOfBounds (Token _ _ pos) idx) = T.concat ["Index ", T.pack $ show idx, " out of bounds at ", T.pack $ show pos, "."]
 showError (ArgumentCount expected received) = T.concat ["expected ", T.pack $ show expected, " arguments, received args [", T.intercalate ", " $ map showValue received, "]" ]
 showError (CallError (Token _ _ pos) err) = T.concat ["Call error at ", T.pack $ show pos, ": ", showError err, "."]
+showError (JSONParsingError err) = T.concat ["Error parsing input JSON: ", err]
 
-data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftBrace | TokenLeftBracket | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull | TokenBackslash | TokenArrow
+data TokenType = TokenEqual | TokenEqualEqual | TokenBang | TokenBangEqual | TokenAndAnd | TokenOrOr | TokenGreater | TokenGreaterEqual | TokenLess | TokenLessEqual | TokenMinus | TokenPlus | TokenSlash | TokenStar | TokenLeftBrace | TokenLeftBracket | TokenLeftParen | TokenIdentifier | TokenLet | TokenSemicolon | TokenColon | TokenQuestion | TokenTrue | TokenFalse | TokenNull | TokenBackslash | TokenArrow | TokenDollar
   deriving (Show)
 
 data Token = Token

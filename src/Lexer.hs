@@ -71,6 +71,10 @@ star = tokenReservedOp TokenStar "*"
 
 slash = tokenReservedOp TokenSlash "/"
 
+tokenBackslash = tokenReservedOp TokenBackslash "\\"
+
+tokenArrow = tokenReservedOp TokenArrow "=>"
+
 letVar = tokenReserved TokenLet "let"
 
 tokenTrue = tokenReserved TokenTrue "true"
@@ -79,9 +83,7 @@ tokenFalse = tokenReserved TokenFalse "false"
 
 tokenNull = tokenReserved TokenNull "null"
 
-tokenBackslash = tokenReservedOp TokenBackslash "\\"
-
-tokenArrow = tokenReservedOp TokenArrow "=>"
+tokenDollar = tokenReserved TokenDollar "$"
 
 parens = P.parens hsonLexer
 

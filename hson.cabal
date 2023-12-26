@@ -25,6 +25,9 @@ library
     exposed-modules:
       Native,
       Parser,
+      Opts,
+      IO,
+      JSONParser,
       Lexer,
       HSONValue,
       Interpreter
@@ -41,6 +44,7 @@ library
      bytestring,
      containers,
      mtl,
+     optparse-applicative,
      parsec,
      scientific,
      text,
