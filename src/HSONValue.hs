@@ -75,7 +75,7 @@ showError :: HSONError -> T.Text
 showError (UnhandledOperator (Token _ lit pos)) = case lit of
   Just (String t) -> T.concat ["Unhandled binary operator \"", t, "\" at ", T.pack $ show pos, "."]
   Nothing         -> T.concat ["Unhandled binary operator at ", T.pack $ show pos, "."]
-showError (TypeError (Token _ _ pos) msg)                  = T.concat["Type error at ", T.pack $ show pos, ": ", msg, "."]
+showError (TypeError (Token _ _ pos) msg)                  = T.concat["Type error at ", T.pack $ show pos, ": ", msg]
 showError (UnexpectedType expected received) = T.concat ["Expected ", expected, " received ", received]
 showError (UndefinedVariable (Token _ (Just (String t)) pos)) = T.concat ["Undefined variable \"", t, "\" at ", T.pack $ show pos]
 showError (UncallableExpression (Token _ lit pos)) = case lit of

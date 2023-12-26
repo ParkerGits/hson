@@ -15,7 +15,7 @@ mkMethod :: (HSONValue -> [HSONValue] -> Eval HSONValue) -> HSONValue
 mkMethod f = Method (Func . f)
 
 arrayMethods :: Map.Map T.Text HSONValue
-arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap), ("filter", mkMethod hsonFilter)]
+arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap), ("filter", mkMethod hsonFilter), ("reduce", mkMethod hsonReduce)]
 
 hsonLength :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonLength this [] = do
@@ -49,8 +49,12 @@ hsonFilter this [Lambda (Func f) env] =
 hsonFilter _ [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonFilter _ args  = throwError $ ArgumentCount 1 args
 
--- hsonReduce :: HSONValue -> [HSONValue] -> Eval HSONValue
--- hsonReduce this [Lambda (Func f)]
+hsonReduce :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonReduce this [Lambda (Func f) env, initial] =
+  case this of
+    Array arr -> local (const env) (V.foldM (\a b -> f [a, b]) initial arr)
+hsonReduce this [arg, _]=throwError $ UnexpectedType "lambda" (showType arg)
+hsonReduce _ args = throwError $ ArgumentCount 2 args
 
 showType :: HSONValue -> T.Text
 showType (Lambda _ _) = "lambda"

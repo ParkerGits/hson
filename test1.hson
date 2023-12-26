@@ -1,3 +1,3 @@
-let arr = [0,1,2,0,2];
-let f = \(i) => i == 2;
-arr.filter(f)
+let arr = [1, 4];
+let f = \(a,b) => a + b;
+arr.reduce(f, 0)
