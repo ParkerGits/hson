@@ -15,7 +15,7 @@ mkMethod :: (HSONValue -> [HSONValue] -> Eval HSONValue) -> HSONValue
 mkMethod f = Method (Func . f)
 
 arrayMethods :: Map.Map T.Text HSONValue
-arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap), ("filter", mkMethod hsonFilter), ("reduce", mkMethod hsonReduce)]
+arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap), ("filter", mkMethod hsonFilter), ("reduce", mkMethod hsonReduce), ("some", mkMethod hsonSome), ("all", mkMethod hsonAll)]
 
 hsonLength :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonLength this [] = do
@@ -53,8 +53,22 @@ hsonReduce :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonReduce this [Lambda (Func f) env, initial] =
   case this of
     Array arr -> local (const env) (V.foldM (\a b -> f [a, b]) initial arr)
-hsonReduce this [arg, _]=throwError $ UnexpectedType "lambda" (showType arg)
+hsonReduce this [arg, _] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonReduce _ args = throwError $ ArgumentCount 2 args
+
+hsonSome :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonSome this [Lambda (Func f) env] =
+  case this of
+    Array arr -> local (const env) (Bool <$> vAnyM (\x -> isTruthy <$> f (singleton x)) arr)
+hsonSome this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonSome _ args = throwError $ ArgumentCount 1 args
+
+hsonAll :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonAll this [Lambda (Func f) env] =
+  case this of
+    Array arr -> local (const env) (Bool <$> vAllM (\x -> isTruthy <$> f (singleton x)) arr)
+hsonAll this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonAll _ args = throwError $ ArgumentCount 1 args
 
 showType :: HSONValue -> T.Text
 showType (Lambda _ _) = "lambda"
@@ -71,3 +85,21 @@ isTruthy (String v) = not $ T.null v
 isTruthy (Bool v)   = v
 isTruthy Null       = False
 isTruthy _          = True
+
+vAllM :: Monad m => (a -> m Bool) -> V.Vector a -> m Bool
+vAllM p = V.foldr ((&&^) . p) (pure True)
+
+vAnyM :: Monad m => (a -> m Bool) -> V.Vector a -> m Bool
+vAnyM p = V.foldr ((||^) . p) (pure False)
+
+ifM :: Monad m => m Bool -> m a -> m a -> m a
+ifM b t f = do b <- b; if b then t else f
+
+notM :: Functor m => m Bool -> m Bool
+notM = fmap not
+
+(||^) :: Monad m => m Bool -> m Bool -> m Bool
+(||^) a = ifM a (pure True)
+
+(&&^) :: Monad m => m Bool -> m Bool -> m Bool
+(&&^) a b = ifM a b (pure False)
