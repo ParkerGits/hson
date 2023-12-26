@@ -6,6 +6,7 @@ import           Control.Monad.Reader       (asks)
 import           Control.Monad.Reader.Class
 import           Data.List
 import qualified Data.Map                   as Map
+import           Data.Maybe
 import           Data.Scientific
 import qualified Data.Text                  as T
 import qualified Data.Vector                as V
@@ -15,7 +16,7 @@ mkMethod :: (HSONValue -> [HSONValue] -> Eval HSONValue) -> HSONValue
 mkMethod f = Method (Func . f)
 
 arrayMethods :: Map.Map T.Text HSONValue
-arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap), ("filter", mkMethod hsonFilter), ("reduce", mkMethod hsonReduce), ("some", mkMethod hsonSome), ("all", mkMethod hsonAll)]
+arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap), ("filter", mkMethod hsonFilter), ("reduce", mkMethod hsonReduce), ("some", mkMethod hsonSome), ("all", mkMethod hsonAll), ("find", mkMethod hsonFind)]
 
 hsonLength :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonLength this [] = do
@@ -43,9 +44,9 @@ hsonMap _ [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonMap _ args  = throwError $ ArgumentCount 1 args
 
 hsonFilter :: HSONValue -> [HSONValue] -> Eval HSONValue
-hsonFilter this [Lambda (Func f) env] =
+hsonFilter this [Lambda f env] =
   case this of
-    Array arr -> Array <$> local (const env) (V.filterM (\x -> isTruthy <$> f (singleton x)) arr)
+    Array arr -> Array <$> local (const env) (V.filterM (returnsTruthy f) arr)
 hsonFilter _ [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonFilter _ args  = throwError $ ArgumentCount 1 args
 
@@ -57,18 +58,25 @@ hsonReduce this [arg, _] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonReduce _ args = throwError $ ArgumentCount 2 args
 
 hsonSome :: HSONValue -> [HSONValue] -> Eval HSONValue
-hsonSome this [Lambda (Func f) env] =
+hsonSome this [Lambda f env] =
   case this of
-    Array arr -> local (const env) (Bool <$> vAnyM (\x -> isTruthy <$> f (singleton x)) arr)
+    Array arr -> local (const env) (Bool <$> vAnyM (returnsTruthy f) arr)
 hsonSome this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonSome _ args = throwError $ ArgumentCount 1 args
 
 hsonAll :: HSONValue -> [HSONValue] -> Eval HSONValue
-hsonAll this [Lambda (Func f) env] =
+hsonAll this [Lambda f env] =
   case this of
-    Array arr -> local (const env) (Bool <$> vAllM (\x -> isTruthy <$> f (singleton x)) arr)
+    Array arr -> local (const env) (Bool <$> vAllM (returnsTruthy f) arr)
 hsonAll this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonAll _ args = throwError $ ArgumentCount 1 args
+
+hsonFind :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonFind this [Lambda f env] =
+  case this of
+    Array arr -> local (const env) (fromMaybe Null <$> vFindM (returnsTruthy f) arr)
+hsonFind this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonFind _ args = throwError $ ArgumentCount 1 args
 
 showType :: HSONValue -> T.Text
 showType (Lambda _ _) = "lambda"
@@ -86,11 +94,17 @@ isTruthy (Bool v)   = v
 isTruthy Null       = False
 isTruthy _          = True
 
-vAllM :: Monad m => (a -> m Bool) -> V.Vector a -> m Bool
-vAllM p = V.foldr ((&&^) . p) (pure True)
+returnsTruthy :: Func -> HSONValue -> Eval Bool
+returnsTruthy (Func f) x = isTruthy <$> f (singleton x)
 
 vAnyM :: Monad m => (a -> m Bool) -> V.Vector a -> m Bool
 vAnyM p = V.foldr ((||^) . p) (pure False)
+
+vAllM :: Monad m => (a -> m Bool) -> V.Vector a -> m Bool
+vAllM p = V.foldr ((&&^) . p) (pure True)
+
+vFindM :: Monad m => (a -> m Bool) -> V.Vector a -> m (Maybe a)
+vFindM p = V.foldr (\x -> ifM (p x) (return $ Just x)) (return Nothing)
 
 ifM :: Monad m => m Bool -> m a -> m a -> m a
 ifM b t f = do b <- b; if b then t else f
