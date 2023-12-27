@@ -21,7 +21,7 @@ import Data.Scientific (Scientific, floatingOrInteger)
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import HSONValue
-import Native (arrayMethods, isTruthy)
+import Native (arrayMethods, isTruthy, showType)
 import Parser
 
 runInterpretWithJSON :: HSONValue -> Program -> IO (Either HSONError HSONValue)
@@ -97,6 +97,7 @@ eval (UnaryExpr (Unary opTok r)) = do
   case opTok of
     Token TokenMinus _ _ -> minusValue opTok right
     Token TokenBang _ _ -> return $ Bool $ not $ isTruthy right
+    Token TokenBangBang _ _ -> return $ Bool $ isTruthy right
 eval (VariableExpr (Variable tok@(Token TokenIdentifier (Just (String s)) _))) = do
   env <- ask
   case Map.lookup s env of
@@ -162,14 +163,14 @@ access tok value@(Number idx) (Array arr) = case floatingOrInteger idx of
   Right int -> accessArrayIdx tok int arr
   Left float -> throwError $ InvalidIndex tok value "array"
 access tok (String name) (Array arr) = accessArrayMethod tok name arr
-access tok _ _ = throwError $ UndefinedProperty tok
+access tok value indexed = throwError $ InvalidIndex tok value (showType indexed)
 
 accessObjectProp ::
   Token -> T.Text -> Map.Map T.Text HSONValue -> Eval HSONValue
 accessObjectProp tok name kv = case Map.lookup name kv of
   Just (Method f) -> return $ Function $ f (Object kv)
   Just v -> return v
-  Nothing -> throwError $ UndefinedProperty tok
+  Nothing -> throwError $ UndefinedProperty name tok
 
 accessArrayIdx :: Token -> Int -> V.Vector HSONValue -> Eval HSONValue
 accessArrayIdx tok idx arr = case arr V.!? idx of
@@ -179,4 +180,4 @@ accessArrayIdx tok idx arr = case arr V.!? idx of
 accessArrayMethod :: Token -> T.Text -> V.Vector HSONValue -> Eval HSONValue
 accessArrayMethod tok name arr = case Map.lookup name arrayMethods of
   Just (Method f) -> return $ Function $ f (Array arr)
-  Nothing -> throwError $ UndefinedProperty tok
+  Nothing -> throwError $ UndefinedProperty name tok

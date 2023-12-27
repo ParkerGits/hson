@@ -1,6 +1,7 @@
-module JSONParser (decode) where
+module JSONParser (decode, encodePrettyConfig) where
 
 import qualified Data.Aeson as A
+import qualified Data.Aeson.Encode.Pretty as AP
 import qualified Data.Aeson.Encoding as A
 import qualified Data.Aeson.Key as A
 import qualified Data.Aeson.KeyMap as A
@@ -32,6 +33,16 @@ instance A.ToJSON H.HSONValue where
   toEncoding (H.Number v) = A.scientific v
   toEncoding (H.Bool v) = A.bool v
   toEncoding _ = A.null_
+
+encodePrettyConfig :: Int -> AP.Config
+encodePrettyConfig spaces =
+  ( AP.Config
+      { AP.confTrailingNewline = False
+      , AP.confNumFormat = AP.Generic
+      , AP.confIndent = AP.Spaces spaces
+      , AP.confCompare = mempty
+      }
+  )
 
 decode :: BL.ByteString -> Either String H.HSONValue
 decode = A.eitherDecode

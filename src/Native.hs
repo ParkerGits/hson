@@ -18,6 +18,7 @@ import qualified Data.Text.Lazy.Encoding as T
 import qualified Data.Vector as V
 import qualified Data.Vector.Algorithms.Intro as VA
 import qualified Data.Vector.Generic as MV
+import GHC.IO (unsafePerformIO)
 import HSONValue
 import JSONParser
 
@@ -32,10 +33,18 @@ arrayMethods =
     , ("map", mkMethod hsonMap)
     , ("filter", mkMethod hsonFilter)
     , ("reduce", mkMethod hsonReduce)
-    , ("some", mkMethod hsonSome)
+    , ("every", mkMethod hsonEvery)
     , ("all", mkMethod hsonAll)
     , ("find", mkMethod hsonFind)
     , ("sort", mkMethod hsonSort)
+    , ("insert", mkMethod hsonInsert)
+    , ("splice", mkMethod hsonSplice)
+    , ("push", mkMethod hsonPush)
+    , ("unshift", mkMethod hsonUnshift)
+    , ("pop", mkMethod hsonPop)
+    , ("shift", mkMethod hsonShift)
+    , ("with", mkMethod hsonWith)
+    , ("reverse", mkMethod hsonReverse)
     , ("toString", mkMethod hsonToString)
     , ("toJSON", mkMethod hsonToJSON)
     ]
@@ -55,17 +64,11 @@ hsonToJSON :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonToJSON this [] = case T.decodeUtf8' $ A.encode this of
   Left err -> throwError $ JSONEncodingError err
   Right t -> return $ String $ T.toStrict t
-hsonToJSON this [Number n] = case floatingOrInteger n of
-  Left float -> throwError $ UnexpectedType "integer" "floating"
-  Right spaces -> case T.decodeUtf8' $
+hsonToJSON this [Number n] = do
+  spaces <- intFromNumber n
+  case T.decodeUtf8' $
     AP.encodePretty'
-      ( AP.Config
-          { AP.confTrailingNewline = False
-          , AP.confNumFormat = AP.Generic
-          , AP.confIndent = AP.Spaces spaces
-          , AP.confCompare = mempty
-          }
-      )
+      (encodePrettyConfig spaces)
       this of
     Left err -> throwError $ JSONEncodingError err
     Right t -> return $ String $ T.toStrict t
@@ -73,13 +76,12 @@ hsonToJSON _ [arg] = throwError $ UnexpectedType "number" (showType arg)
 hsonToJSON _ args = throwError $ VariadicArgCount 0 1 args
 
 hsonAt :: HSONValue -> [HSONValue] -> Eval HSONValue
-hsonAt this [Number n] =
-  case floatingOrInteger n of
-    Left float -> throwError $ UnexpectedType "integer" "floating"
-    Right idx -> case this of
-      Array arr -> case arr V.!? idx of
-        Just v -> return v
-        Nothing -> return Null
+hsonAt this [Number n] = do
+  idx <- indexFromNumber n this
+  case this of
+    Array arr -> case arr V.!? idx of
+      Just v -> return v
+      Nothing -> return Null
 hsonAt _ [arg] = throwError $ UnexpectedType "number" (showType arg)
 hsonAt _ args = throwError $ ArgumentCount 1 args
 
@@ -104,12 +106,12 @@ hsonReduce this [Lambda (Func f) env, initial] =
 hsonReduce this [arg, _] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonReduce _ args = throwError $ ArgumentCount 2 args
 
-hsonSome :: HSONValue -> [HSONValue] -> Eval HSONValue
-hsonSome this [Lambda f env] =
+hsonEvery :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonEvery this [Lambda f env] =
   case this of
     Array arr -> local (const env) (Bool <$> vAnyM (returnsTruthy f) arr)
-hsonSome this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
-hsonSome _ args = throwError $ ArgumentCount 1 args
+hsonEvery this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonEvery _ args = throwError $ ArgumentCount 1 args
 
 hsonAll :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonAll this [Lambda f env] =
@@ -124,6 +126,12 @@ hsonFind this [Lambda f env] =
     Array arr -> local (const env) (fromMaybe Null <$> vFindM (returnsTruthy f) arr)
 hsonFind this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonFind _ args = throwError $ ArgumentCount 1 args
+
+hsonReverse :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonReverse this [] =
+  case this of
+    Array arr -> return $ Array $ V.reverse arr
+hsonReverse _ args = throwError $ ArgumentCount 0 args
 
 hsonSort :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonSort this [] = case this of
@@ -150,6 +158,75 @@ hsonSort _ [arg, String _] = throwError $ UnexpectedType "string" (showType arg)
 hsonSort _ [_, arg] = throwError $ UnexpectedType "string" (showType arg)
 hsonSort _ args = throwError $ VariadicArgCount 0 2 args
 
+hsonInsert :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonInsert this [Number n, v] = do
+  index <- indexFromNumber n this
+  case this of
+    Array arr ->
+      let (x, y) = V.splitAt index arr
+       in return $ Array $ x <> V.singleton v <> y
+hsonInsert this [arg, _] = throwError $ UnexpectedType "integer" (showType arg)
+hsonInsert _ args = throwError $ ArgumentCount 2 args
+
+hsonSplice :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonSplice this [Number n] = do
+  index <- indexFromNumber n this
+  case this of
+    Array arr -> return $ Array $ V.take index arr
+hsonSplice this [Number idx, Number n] = do
+  index <- indexFromNumber idx this
+  dropCount <- intFromNumber n
+  case this of
+    Array arr ->
+      let (x, y) = V.splitAt index arr
+       in return $ Array $ x <> V.drop dropCount y
+hsonSplice this [Number idx, Number n, Array inserts] = do
+  index <- indexFromNumber idx this
+  dropCount <- intFromNumber n
+  case this of
+    Array arr ->
+      let (x, y) = V.splitAt index arr
+       in return $ Array $ x <> inserts <> V.drop dropCount y
+hsonSplice this (Number _ : Number _ : arg : _) = throwError $ UnexpectedType "array" (showType arg)
+hsonSplice this (Number _ : arg : _) = throwError $ UnexpectedType "integer" (showType arg)
+hsonSplice this (arg : _) = throwError $ UnexpectedType "integer" (showType arg)
+hsonSplice _ args = throwError $ VariadicArgCount 1 3 args
+
+hsonWith :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonWith this [Number n, v] = do
+  index <- indexFromNumber n this
+  case this of
+    Array arr ->
+      if index `inBounds` arr
+        then return $ Array $ arr V.// [(index, v)]
+        else throwError $ IndexOutOfBounds' index
+hsonWith this [arg, _] = throwError $ UnexpectedType "integer" (showType arg)
+hsonWith _ args = throwError $ ArgumentCount 2 args
+
+hsonPush :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonPush this [v] =
+  case this of
+    Array arr -> return $ Array $ V.snoc arr v
+hsonPush _ args = throwError $ ArgumentCount 1 args
+
+hsonUnshift :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonUnshift this [v] =
+  case this of
+    Array arr -> return $ Array $ V.cons v arr
+hsonUnshift _ args = throwError $ ArgumentCount 1 args
+
+hsonPop :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonPop this [] =
+  case this of
+    Array arr -> return $ Array $ V.init arr
+hsonPop _ args = throwError $ ArgumentCount 0 args
+
+hsonShift :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonShift this [] =
+  case this of
+    Array arr -> return $ Array $ V.tail arr
+hsonShift _ args = throwError $ ArgumentCount 0 args
+
 showType :: HSONValue -> T.Text
 showType (Lambda _ _) = "lambda"
 showType (Array _) = "array"
@@ -165,6 +242,20 @@ isTruthy (String v) = not $ T.null v
 isTruthy (Bool v) = v
 isTruthy Null = False
 isTruthy _ = True
+
+inBounds :: Int -> V.Vector HSONValue -> Bool
+inBounds i arr = i >= 0 && i < V.length arr
+
+indexFromNumber :: Scientific -> HSONValue -> Eval Int
+indexFromNumber n (Array arr) = do
+  index <- intFromNumber n
+  return $ if index >= 0 then index else index + V.length arr
+
+intFromNumber :: Scientific -> Eval Int
+intFromNumber n =
+  case floatingOrInteger n of
+    Left float -> throwError $ UnexpectedType "integer" "floating"
+    Right int -> return int
 
 returnsTruthy :: Func -> HSONValue -> Eval Bool
 returnsTruthy (Func f) x = isTruthy <$> f (singleton x)

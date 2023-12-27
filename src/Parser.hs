@@ -249,8 +249,9 @@ primary =
 
 parseUnary :: HSONParser Expr
 -- Parse a unary operation, then apply it to the next unary expression
-parseUnary = (try parseBang <|> parseMinus) <*> unary
+parseUnary = (try parseBangBang <|> try parseBang <|> parseMinus) <*> unary
  where
+  parseBangBang = parseUnaryOp bangBang
   parseBang = parseUnaryOp bang
   parseMinus = parseUnaryOp minus
 
@@ -336,7 +337,8 @@ parseArray = do
   return $
     ArrayInitializerExpr
       ArrayInitializer
-        { bracket = Token{tokenType = TokenLeftBracket, literal = Nothing, pos = bracketPos}
+        { bracket =
+            Token{tokenType = TokenLeftBracket, literal = Nothing, pos = bracketPos}
         , elements = elems
         }
 
@@ -365,7 +367,8 @@ parseLogicalOp :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
 parseLogicalOp op = do
   logiOp <- op
   pos <- getPosition
-  return (\l r -> LogicalExpr Logical{logiLeft = l, logiOp = logiOp, logiRight = r})
+  return
+    (\l r -> LogicalExpr Logical{logiLeft = l, logiOp = logiOp, logiRight = r})
 
 parseBinaryOp :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
 parseBinaryOp op = do

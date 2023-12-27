@@ -43,6 +43,7 @@ hsonStyle =
         , ":"
         , "=>"
         , "\\"
+        , "!!"
         ]
     , P.reservedNames = ["$", "true", "false", "let", "null"]
     , P.opStart = P.opLetter hsonStyle
@@ -76,6 +77,8 @@ tokenReserved tt s = do
 equal = tokenReservedOp TokenEqual "="
 
 bang = tokenReservedOp TokenBang "!"
+
+bangBang = tokenReservedOp TokenBangBang "!!"
 
 semicolon = tokenReservedOp TokenSemicolon ";"
 

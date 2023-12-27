@@ -111,9 +111,10 @@ data HSONError
   | UnexpectedType T.Text T.Text
   | UndefinedVariable Token
   | UncallableExpression Token
-  | UndefinedProperty Token
+  | UndefinedProperty T.Text Token
   | InvalidIndex Token HSONValue T.Text
   | IndexOutOfBounds Token Int
+  | IndexOutOfBounds' Int
   | ArgumentCount Int [HSONValue]
   | VariadicArgCount Int Int [HSONValue]
   | CallError Token HSONError
@@ -134,7 +135,7 @@ showError (UndefinedVariable (Token _ (Just (String t)) pos)) = T.concat ["Undef
 showError (UncallableExpression (Token _ lit pos)) = case lit of
   Just (String t) -> T.concat ["Uncallable expression \"", t, "\" at ", T.pack $ show pos, "."]
   Nothing -> T.concat ["Uncallable expression at ", T.pack $ show pos, "."]
-showError (UndefinedProperty (Token _ (Just (String t)) pos)) = T.concat ["Property ", t, " does not exist at ", T.pack $ show pos, "."]
+showError (UndefinedProperty name (Token _ _ pos)) = T.concat ["Property ", name, " does not exist at ", T.pack $ show pos, "."]
 showError (InvalidIndex (Token _ _ pos) val objType) =
   T.concat
     [ "Cannot index "
@@ -148,6 +149,9 @@ showError (InvalidIndex (Token _ _ pos) val objType) =
 showError (IndexOutOfBounds (Token _ _ pos) idx) =
   T.concat
     ["Index ", T.pack $ show idx, " out of bounds at ", T.pack $ show pos, "."]
+showError (IndexOutOfBounds' idx) =
+  T.concat
+    ["Index ", T.pack $ show idx, " out of bounds"]
 showError (ArgumentCount expected received) =
   T.concat
     [ "Expected "
@@ -200,6 +204,7 @@ data TokenType
   | TokenBackslash
   | TokenArrow
   | TokenDollar
+  | TokenBangBang
   deriving (Show)
 
 data Token = Token
