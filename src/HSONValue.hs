@@ -205,6 +205,7 @@ data TokenType
   | TokenArrow
   | TokenDollar
   | TokenBangBang
+  | TokenQuestionQuestion
   deriving (Show)
 
 data Token = Token

@@ -42,6 +42,9 @@ interpret ((VarStmt (Token _ (Just (String name)) _) initializer) : stmts, expr)
 eval :: Expr -> Eval HSONValue
 eval (ArrowFunctionExpr (ArrowFunction params body)) = toLambda params body
 eval (ArrayInitializerExpr (ArrayInitializer bracketTok elems)) = Array . V.fromList <$> mapM eval elems
+eval (BinaryExpr (Binary l (Token TokenQuestionQuestion _ _) r)) = do
+  left <- eval l
+  if left == Null then eval r else return left
 eval (BinaryExpr (Binary l opTok r)) = do
   left <- eval l
   right <- eval r
@@ -170,7 +173,7 @@ accessObjectProp ::
 accessObjectProp tok name kv = case Map.lookup name kv of
   Just (Method f) -> return $ Function $ f (Object kv)
   Just v -> return v
-  Nothing -> throwError $ UndefinedProperty name tok
+  Nothing -> return Null
 
 accessArrayIdx :: Token -> Int -> V.Vector HSONValue -> Eval HSONValue
 accessArrayIdx tok idx arr = case arr V.!? idx of

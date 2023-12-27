@@ -165,7 +165,7 @@ expression = ternary
 
 ternary :: HSONParser Expr
 ternary = do
-  expr <- logicOr
+  expr <- nullCoalesce
   try
     ( do
         question
@@ -177,6 +177,12 @@ ternary = do
             Conditional{condition = expr, matched = matched, unmatched = unmatched}
     )
     <|> return expr
+
+nullCoalesce :: HSONParser Expr
+nullCoalesce = do
+  chainl1 logicOr parseNullCoalesce
+ where
+  parseNullCoalesce = parseBinaryOp questionQuestion
 
 logicOr :: HSONParser Expr
 logicOr = do

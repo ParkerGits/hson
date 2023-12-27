@@ -44,6 +44,7 @@ hsonStyle =
         , "=>"
         , "\\"
         , "!!"
+        , "??"
         ]
     , P.reservedNames = ["$", "true", "false", "let", "null"]
     , P.opStart = P.opLetter hsonStyle
@@ -85,6 +86,8 @@ semicolon = tokenReservedOp TokenSemicolon ";"
 colon = tokenReservedOp TokenColon ":"
 
 question = tokenReservedOp TokenQuestion "?"
+
+questionQuestion = tokenReservedOp TokenQuestionQuestion "??"
 
 orOr = tokenReservedOp TokenOrOr "||"
 
