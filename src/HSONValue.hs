@@ -7,6 +7,7 @@ import           Control.Monad.Except   (ExceptT, MonadError)
 import           Control.Monad.IO.Class (MonadIO)
 import           Control.Monad.Reader   (MonadReader, ReaderT)
 import qualified Data.Map               as Map
+import           Data.Ord               (Down (Down))
 import           Data.Scientific        (Scientific, floatingOrInteger)
 import qualified Data.Text              as T
 import qualified Data.Vector            as V
@@ -24,6 +25,50 @@ data HSONValue = Function Func
 
 instance Show HSONValue where
   show = T.unpack . showValue
+
+instance Eq HSONValue where
+  (==) (String x) (String y) = x == y
+  (==) (Number x) (Number y) = x == y
+  (==) (Bool x) (Bool y)     = x == y
+  (==) Null Null             = True
+  (==) _ _                   = False
+
+instance Ord HSONValue where
+  compare (String x) (String y) = compare x y
+  compare (Number x) (Number y) = compare x y
+  compare (Bool x) (Bool y)     = compare x y
+  compare (Object x) (Object y) = compare x y
+  compare _ _                   = EQ
+
+data SortedValue = Asc HSONValue
+                 | Desc HSONValue
+                 | AscByKey T.Text HSONValue
+                 | DescByKey T.Text HSONValue
+  deriving (Eq, Show)
+
+instance Ord SortedValue where
+  compare (Asc x) (Asc y) = compare x y
+  compare (Desc x) (Desc y) = compare (Down x) (Down y)
+  compare (AscByKey t1 (Object x)) (AscByKey t2 (Object y)) =
+    case (Map.lookup t1 x, Map.lookup t2 y) of
+      (Nothing, Nothing) -> EQ
+      (Nothing, Just _)  -> LT
+      (Just _, Nothing)  -> GT
+      (Just v1, Just v2) -> compare v1 v2
+  compare (AscByKey _ x) (AscByKey _ y) = compare (Asc x) (Asc y)
+  compare (DescByKey t1 (Object x)) (DescByKey t2 (Object y)) =
+    case (Map.lookup t1 x, Map.lookup t2 y) of
+      (Nothing, Nothing) -> EQ
+      (Nothing, Just _)  -> GT
+      (Just _, Nothing)  -> LT
+      (Just v1, Just v2) -> compare (Down v1) (Down v2)
+  compare (DescByKey _ x) (DescByKey _ y) = compare (Desc x) (Desc y)
+
+fromSorted :: SortedValue -> HSONValue
+fromSorted (Asc v)         = v
+fromSorted (Desc v)        = v
+fromSorted  (AscByKey _ v) = v
+fromSorted (DescByKey _ v) = v
 
 showValue :: HSONValue -> T.Text
 showValue (Function _) = "(native function)"
@@ -65,6 +110,7 @@ data HSONError = UnhandledOperator Token
                | InvalidIndex Token HSONValue T.Text
                | IndexOutOfBounds Token Int
                | ArgumentCount Int [HSONValue]
+               | VariadicArgCount Int Int [HSONValue]
                | CallError Token HSONError
                | JSONParsingError T.Text
 
@@ -85,6 +131,7 @@ showError (UndefinedProperty (Token _ (Just (String t)) pos)) = T.concat ["Prope
 showError (InvalidIndex (Token _ _ pos) val objType) = T.concat ["Cannot index ", objType, " with ", showValue val, " at ", T.pack $ show pos, "."]
 showError (IndexOutOfBounds (Token _ _ pos) idx) = T.concat ["Index ", T.pack $ show idx, " out of bounds at ", T.pack $ show pos, "."]
 showError (ArgumentCount expected received) = T.concat ["Expected ", T.pack $ show expected, " ", if expected /= 1 then "arguments" else "argument" , ", received args [", T.intercalate ", " $ map showValue received, "]" ]
+showError (VariadicArgCount minExpected maxExpected received) = T.concat ["Expected ", T.pack $ show minExpected, " to ", T.pack $ show maxExpected, " arguments, received args [", T.intercalate ", " $ map showValue received, "]" ]
 showError (CallError (Token _ _ pos) err) = T.concat ["Call error at ", T.pack $ show pos, ": ", showError err, "."]
 showError (JSONParsingError err) = T.concat ["Error parsing input JSON: ", err]
 

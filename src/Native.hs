@@ -2,21 +2,23 @@
 
 module Native where
 import           Control.Monad.Except
-import           Control.Monad.Reader       (asks)
+import           Control.Monad.Reader         (asks)
 import           Control.Monad.Reader.Class
 import           Data.List
-import qualified Data.Map                   as Map
+import qualified Data.Map                     as Map
 import           Data.Maybe
 import           Data.Scientific
-import qualified Data.Text                  as T
-import qualified Data.Vector                as V
+import qualified Data.Text                    as T
+import qualified Data.Vector                  as V
+import qualified Data.Vector.Algorithms.Intro as VA
+import qualified Data.Vector.Generic          as MV
 import           HSONValue
 
 mkMethod :: (HSONValue -> [HSONValue] -> Eval HSONValue) -> HSONValue
 mkMethod f = Method (Func . f)
 
 arrayMethods :: Map.Map T.Text HSONValue
-arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap), ("filter", mkMethod hsonFilter), ("reduce", mkMethod hsonReduce), ("some", mkMethod hsonSome), ("all", mkMethod hsonAll), ("find", mkMethod hsonFind)]
+arrayMethods = Map.fromList [("length", mkMethod hsonLength), ("at", mkMethod hsonAt), ("map", mkMethod hsonMap), ("filter", mkMethod hsonFilter), ("reduce", mkMethod hsonReduce), ("some", mkMethod hsonSome), ("all", mkMethod hsonAll), ("find", mkMethod hsonFind), ("sort", mkMethod hsonSort)]
 
 hsonLength :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonLength this [] = do
@@ -78,13 +80,31 @@ hsonFind this [Lambda f env] =
 hsonFind this [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonFind _ args = throwError $ ArgumentCount 1 args
 
+hsonSort :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonSort this [] = case this of
+  Array arr -> return $ Array $ V.map fromSorted $ MV.modify VA.sort (V.map Asc arr)
+hsonSort this [String s] = case this of
+  Array arr -> case s of
+    "ASC" -> return $ Array $ V.map fromSorted $ MV.modify VA.sort (V.map Asc arr)
+    "DSC" -> return $ Array $ V.map fromSorted $ MV.modify VA.sort (V.map Desc arr)
+    arg -> throwError $ UnexpectedType "\"ASC\" or \"DSC\"" (T.concat ["\"", arg, "\""])
+hsonSort _ [arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonSort this [String s, String key] = case this of
+  Array arr -> case s of
+    "ABK" -> return $ Array $ V.map fromSorted $ MV.modify VA.sort (V.map (AscByKey key) arr)
+    "DBK" -> return $ Array $ V.map fromSorted $ MV.modify VA.sort (V.map (DescByKey key) arr)
+    arg -> throwError $ UnexpectedType "\"ASC\" or \"DSC\"" (T.concat ["\"", arg, "\""])
+hsonSort _ [arg, String _] = throwError $ UnexpectedType "string" (showType arg)
+hsonSort _ [_, arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonSort _ args = throwError $ VariadicArgCount 0 2 args
+
 showType :: HSONValue -> T.Text
 showType (Lambda _ _) = "lambda"
 showType (Array _)    = "array"
 showType (Object _)   = "object"
 showType (String _)   = "string"
 showType (Number _)   = "number"
-showType (Bool _)     = "true"
+showType (Bool _)     = "bool"
 showType Null         = "null"
 
 isTruthy :: HSONValue -> Bool

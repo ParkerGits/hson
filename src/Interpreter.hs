@@ -39,8 +39,8 @@ eval (BinaryExpr (Binary l opTok r)) = do
   left <- eval l
   right <- eval r
   case opTok of
-    Token TokenEqualEqual _ _   -> return $ Bool $ valueEq left right
-    Token TokenBangEqual _ _    -> return $ Bool $ valueNeq left right
+    Token TokenEqualEqual _ _   -> return $ Bool $ left == right
+    Token TokenBangEqual _ _    -> return $ Bool $ left == right
     Token TokenGreater _ _      -> numCmp opTok (>) left right
     Token TokenGreaterEqual _ _ -> numCmp opTok (>=) left right
     Token TokenLess _ _         -> numCmp opTok (<) left right
@@ -105,16 +105,6 @@ eval (VariableExpr (Variable tok@(Token TokenIdentifier (Just (String s)) _))) =
   case Map.lookup s env of
     Just value -> return value
     Nothing    -> throwError $ UndefinedVariable tok
-
-valueEq :: HSONValue -> HSONValue -> Bool
-valueEq (String x) (String y) = x == y
-valueEq (Number x) (Number y) = x == y
-valueEq (Bool x) (Bool y)     = x == y
-valueEq Null Null             = True
-valueEq _ _                   = False
-
-valueNeq :: HSONValue -> HSONValue -> Bool
-valueNeq x y = not $ valueEq x y
 
 numCmp :: Token -> (Scientific -> Scientific -> Bool) -> HSONValue -> HSONValue -> Eval HSONValue
 numCmp _ op (Number x) (Number y) =  return $ Bool $ op x y

@@ -1,3 +1,4 @@
-let arr = [1, 1, 2];
-let f = \(n) => n == 3;
-arr.find(f)
+let arr = [5,2,3,1,0, -1];
+let k = arr.sort();
+let g = arr;
+k
