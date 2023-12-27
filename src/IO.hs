@@ -1,5 +1,6 @@
 module IO where
 
+import Control.Monad
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -9,13 +10,16 @@ import JSONParser
 import Opts (
   HSONInput (CmdLineIn, HSONFileInput),
   JSONInput (JSONFileInput, NoJSONInput, StdIn),
+  Options (doPrintAst),
  )
 import Parser
 
-run :: Maybe BL.ByteString -> T.Text -> IO ()
-run json hson = case parseHSON hson of
+run :: Maybe BL.ByteString -> T.Text -> Options -> IO ()
+run json hson opts = case parseHSON hson of
   Left err -> print err
-  Right prog -> runProg json prog
+  Right prog -> do
+    when (doPrintAst opts) (print prog)
+    runProg json prog
 
 runProg :: Maybe BL.ByteString -> Program -> IO ()
 runProg Nothing prog = runInterpretNoJSON prog >>= printResult

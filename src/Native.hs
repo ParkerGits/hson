@@ -18,7 +18,6 @@ import qualified Data.Text.Lazy.Encoding as T
 import qualified Data.Vector as V
 import qualified Data.Vector.Algorithms.Intro as VA
 import qualified Data.Vector.Generic as MV
-import GHC.IO (unsafePerformIO)
 import HSONValue
 import JSONParser
 

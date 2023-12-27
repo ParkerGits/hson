@@ -1,3 +1,5 @@
-Up to date
-Hello, Haskell!
-"[\n    {\n        \"123\": \"hello\",\n        \"456\": \"world\"\n    },\n    {\n        \"123\": \"hello\"\n    }\n]"
+[
+  "hello",
+  "hello",
+  "hey"
+]

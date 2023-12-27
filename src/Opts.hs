@@ -3,8 +3,9 @@ module Opts where
 import Options.Applicative
 
 data Options = Options
-  { hsonInput :: HSONInput
-  , jsonInput :: JSONInput
+  { hsonInputOpt :: HSONInput
+  , jsonInputOpt :: JSONInput
+  , doPrintAst :: Bool
   }
 
 data HSONInput
@@ -17,7 +18,11 @@ data JSONInput
   | NoJSONInput
 
 opts :: Parser Options
-opts = Options <$> (hsonFileInput <|> cmdLineIn) <*> (jsonFileInput <|> stdin)
+opts =
+  Options
+    <$> (hsonFileInput <|> cmdLineIn)
+    <*> (jsonFileInput <|> stdin)
+    <*> printParseTree
 
 hsonFileInput :: Parser HSONInput
 hsonFileInput =
@@ -50,6 +55,13 @@ stdin =
     StdIn
     NoJSONInput
     (long "no-json" <> short 'n' <> help "Run HSON without a JSON input.")
+
+printParseTree :: Parser Bool
+printParseTree =
+  flag
+    False
+    True
+    (long "print-hson-ast" <> short 'p' <> help "Print the HSON parse tree")
 
 testOpts =
   execParser $

@@ -6,12 +6,12 @@ import Interpreter
 import JSONParser (decode)
 import Opts (
   HSONInput (CmdLineIn, HSONFileInput),
-  Options (Options, hsonInput, jsonInput),
+  Options (hsonInputOpt, jsonInputOpt),
   testOpts,
  )
 
 main = do
   opts <- testOpts
-  hsonIn <- readHSON $ hsonInput opts
-  jsonIn <- readJSON $ jsonInput opts
-  run jsonIn hsonIn
+  hsonIn <- readHSON $ hsonInputOpt opts
+  jsonIn <- readJSON $ jsonInputOpt opts
+  run jsonIn hsonIn opts
