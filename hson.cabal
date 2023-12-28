@@ -23,7 +23,9 @@ extra-source-files: CHANGELOG.md
 
 library
     exposed-modules:
-      Native,
+      Methods.General,
+      Methods.Array,
+      Methods.Helpers,
       Parser,
       Opts,
       IO,

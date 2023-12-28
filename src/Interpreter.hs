@@ -21,7 +21,8 @@ import Data.Scientific (Scientific, floatingOrInteger)
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import HSONValue
-import Native (arrayMethods, isTruthy, showType)
+import Methods.Array
+import Methods.Helpers
 import Parser
 
 runInterpretWithJSON :: HSONValue -> Program -> IO (Either HSONError HSONValue)
