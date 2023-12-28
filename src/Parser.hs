@@ -324,8 +324,7 @@ parseGrouping = GroupingExpr . Grouping <$> parens expression
 
 parseArrowFunction :: HSONParser Expr
 parseArrowFunction = do
-  tokenBackslash
-  params <- parens parameters
+  params <- pipes parameters
   tokenArrow
   body <- expression
   return $ ArrowFunctionExpr ArrowFunction{params = params, body = body}

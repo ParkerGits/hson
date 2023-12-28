@@ -14,6 +14,7 @@ import Text.Parsec (
   ParsecT,
   SourcePos,
   alphaNum,
+  between,
   char,
   getPosition,
   letter,
@@ -144,6 +145,13 @@ commaSep1 = P.commaSep1 hsonLexer
 brackets = P.brackets hsonLexer
 
 braces = P.braces hsonLexer
+
+lexeme = P.lexeme hsonLexer
+
+symbol = P.symbol hsonLexer
+
+pipes =
+  between (symbol "|") (symbol "|")
 
 identifier = do
   name <- P.identifier hsonLexer
