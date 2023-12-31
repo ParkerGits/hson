@@ -26,6 +26,7 @@ library
       Methods.General,
       Methods.Array,
       Methods.Helpers,
+      Methods.String,
       Parser,
       Opts,
       IO,

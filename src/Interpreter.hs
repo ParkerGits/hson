@@ -23,6 +23,7 @@ import qualified Data.Vector as V
 import HSONValue
 import Methods.Array
 import Methods.Helpers
+import Methods.String
 import Parser
 
 runInterpretWithJSON :: HSONValue -> Program -> IO (Either HSONError HSONValue)
@@ -151,7 +152,7 @@ toLambda params expr = asks (Lambda . Func $ \args -> toLambda' params expr args
 
 toLambda' :: [Token] -> Expr -> [HSONValue] -> Eval HSONValue
 toLambda' params expr args
-  | length params /= length args = throwError $ ArgumentCount (length params) args
+  | length args < length params = throwError $ ArgumentCount (length params) args
   | otherwise = do
       let params' = map toIdent params
           env = Map.fromList (zip params' args)
@@ -167,6 +168,7 @@ access tok value@(Number idx) (Array arr) = case floatingOrInteger idx of
   Right int -> accessArrayIdx tok int arr
   Left float -> throwError $ InvalidIndex tok value "array"
 access tok (String name) (Array arr) = accessArrayMethod tok name arr
+access tok (String name) (String str) = accessStringMethod tok name str
 access tok value indexed = throwError $ InvalidIndex tok value (showType indexed)
 
 accessObjectProp ::
@@ -184,4 +186,9 @@ accessArrayIdx tok idx arr = case arr V.!? idx of
 accessArrayMethod :: Token -> T.Text -> V.Vector HSONValue -> Eval HSONValue
 accessArrayMethod tok name arr = case Map.lookup name arrayMethods of
   Just (Method f) -> return $ Function $ f (Array arr)
+  Nothing -> throwError $ UndefinedProperty name tok
+
+accessStringMethod :: Token -> T.Text -> T.Text -> Eval HSONValue
+accessStringMethod tok name str = case Map.lookup name stringMethods of
+  Just (Method f) -> return $ Function $ f (String str)
   Nothing -> throwError $ UndefinedProperty name tok

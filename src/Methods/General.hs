@@ -17,10 +17,9 @@ import JSONParser
 import Methods.Helpers
 
 hsonLength :: HSONValue -> [HSONValue] -> Eval HSONValue
-hsonLength this [] = do
-  case this of
-    Array arr -> return $ Number $ fromIntegral $ V.length arr
-    String str -> return $ Number $ fromIntegral $ T.length str
+hsonLength this [] = case this of
+  Array arr -> return $ Number $ fromIntegral $ V.length arr
+  String str -> return $ Number $ fromIntegral $ T.length str
 hsonLength _ args = throwError $ ArgumentCount 0 args
 
 hsonToString :: HSONValue -> [HSONValue] -> Eval HSONValue
@@ -51,3 +50,9 @@ hsonAt this [Number n] = do
       Nothing -> return Null
 hsonAt _ [arg] = throwError $ UnexpectedType "number" (showType arg)
 hsonAt _ args = throwError $ ArgumentCount 1 args
+
+hsonReverse :: HSONValue -> [HSONValue] -> Eval HSONValue
+hsonReverse this [] = case this of
+  Array arr -> return $ Array $ V.reverse arr
+  String str -> return $ String $ T.reverse str
+hsonReverse _ args = throwError $ ArgumentCount 0 args

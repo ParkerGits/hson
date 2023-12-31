@@ -69,10 +69,6 @@ hsonFind (Array arr) [Lambda f env] = local (const env) (fromMaybe Null <$> vFin
 hsonFind (Array arr) [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 hsonFind _ args = throwError $ ArgumentCount 1 args
 
-hsonReverse :: HSONValue -> [HSONValue] -> Eval HSONValue
-hsonReverse (Array arr) [] = return $ Array $ V.reverse arr
-hsonReverse _ args = throwError $ ArgumentCount 0 args
-
 hsonSort :: HSONValue -> [HSONValue] -> Eval HSONValue
 hsonSort (Array arr) [] = return $ Array $ V.map fromSorted $ MV.modify VA.sort (V.map Asc arr)
 hsonSort (Array arr) [String s] = case s of
