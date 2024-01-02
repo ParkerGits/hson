@@ -161,7 +161,28 @@ varDecl = do
   return VarStmt{declName = declName, initializer = initializer}
 
 expression :: HSONParser Expr
-expression = ternary
+expression = pipeForward
+
+pipeForward :: HSONParser Expr
+pipeForward = do
+  expr <- ternary
+  try
+    ( do
+        tokenPipeForward
+        f <- chainl1 parsePipeInto parsePipeForward
+        return $ f expr
+    )
+    <|> return expr
+ where
+  parsePipeInto = do
+    into <- call
+    case into of
+      CallExpr f ->
+        return $ \piped -> CallExpr Call{callee = callee f, paren = paren f, args = piped : args f}
+      _ -> fail "can only pipe into call expressions"
+  parsePipeForward = do
+    tokenPipeForward
+    return $ \l r piped -> r $ l piped
 
 ternary :: HSONParser Expr
 ternary = do
@@ -232,7 +253,7 @@ unary = try parseUnary <|> call
 call :: HSONParser Expr
 call = do
   expr <- primary
-  try (threadl expr <$> many (try $ parseCall <|> try parseIndex <|> parseGet))
+  try (threadl expr <$> many (try parseCall <|> try parseIndex <|> parseGet))
     <|> return expr
  where
   -- the parsed expression becomes the callee/indexed/object for the next call/index/get expression

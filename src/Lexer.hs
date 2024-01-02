@@ -46,6 +46,7 @@ hsonStyle =
         , "\\"
         , "!!"
         , "??"
+        , "|>"
         ]
     , P.reservedNames = ["$", "true", "false", "let", "null"]
     , P.opStart = P.opLetter hsonStyle
@@ -117,6 +118,8 @@ slash = tokenReservedOp TokenSlash "/"
 tokenBackslash = tokenReservedOp TokenBackslash "\\"
 
 tokenArrow = tokenReservedOp TokenArrow "=>"
+
+tokenPipeForward = tokenReservedOp TokenPipeForward "|>"
 
 letVar = tokenReserved TokenLet "let"
 

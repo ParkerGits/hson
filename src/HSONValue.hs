@@ -206,6 +206,7 @@ data TokenType
   | TokenDollar
   | TokenBangBang
   | TokenQuestionQuestion
+  | TokenPipeForward
   deriving (Show)
 
 data Token = Token
