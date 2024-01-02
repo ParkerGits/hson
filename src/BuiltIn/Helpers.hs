@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Methods.Helpers where
+module BuiltIn.Helpers where
 
 import Control.Monad.Except
 import Data.List
@@ -9,7 +9,14 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import HSONValue
 
-mkMethod :: (HSONValue -> [HSONValue] -> Eval HSONValue) -> HSONValue
+type FunctionDefinition = [HSONValue] -> Eval HSONValue
+
+mkFunction :: FunctionDefinition -> HSONValue
+mkFunction f = Function (Func f)
+
+type MethodDefinition = HSONValue -> [HSONValue] -> Eval HSONValue
+
+mkMethod :: MethodDefinition -> HSONValue
 mkMethod f = Method (Func . f)
 
 showType :: HSONValue -> T.Text

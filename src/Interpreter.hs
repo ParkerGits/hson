@@ -2,6 +2,10 @@
 
 module Interpreter where
 
+import BuiltIn.Array
+import BuiltIn.Function (builtInFunctions)
+import BuiltIn.Helpers
+import BuiltIn.String
 import Control.Monad.Except (
   MonadError (throwError),
   catchError,
@@ -21,16 +25,16 @@ import Data.Scientific (Scientific, floatingOrInteger)
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import HSONValue
-import Methods.Array
-import Methods.Helpers
-import Methods.String
 import Parser
 
 runInterpretWithJSON :: HSONValue -> Program -> IO (Either HSONError HSONValue)
-runInterpretWithJSON json = runInterpret (Map.singleton "$" json)
+runInterpretWithJSON json = runInterpret (mkEnv json)
 
 runInterpretNoJSON :: Program -> IO (Either HSONError HSONValue)
-runInterpretNoJSON = runInterpret (Map.singleton "$" Null)
+runInterpretNoJSON = runInterpret (mkEnv Null)
+
+mkEnv :: HSONValue -> Environment
+mkEnv json = Map.singleton "$" json `Map.union` builtInFunctions
 
 runInterpret :: Environment -> Program -> IO (Either HSONError HSONValue)
 runInterpret env prog = runExceptT $ runReaderT (unEval $ interpret prog) env
