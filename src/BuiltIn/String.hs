@@ -22,6 +22,9 @@ stringMethods =
     , ("split", mkMethod hsonSplit)
     , ("words", mkMethod hsonWords)
     , ("lines", mkMethod hsonLines)
+    , ("startsWith", mkMethod hsonStartsWith)
+    , ("endsWith", mkMethod hsonEndsWith)
+    , ("replace", mkMethod hsonReplace)
     ]
 
 hsonIncludes :: MethodDefinition
@@ -41,3 +44,19 @@ hsonWords _ args = throwError $ ArgumentCount 0 args
 hsonLines :: MethodDefinition
 hsonLines (String str) [] = return $ Array $ V.map String $ V.fromList $ T.lines str
 hsonLines _ args = throwError $ ArgumentCount 0 args
+
+hsonStartsWith :: MethodDefinition
+hsonStartsWith (String str) [String prefix] = return $ Bool $ prefix `T.isPrefixOf` str
+hsonStartsWith (String _) [arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonStartsWith _ args = throwError $ ArgumentCount 1 args
+
+hsonEndsWith :: MethodDefinition
+hsonEndsWith (String str) [String suffix] = return $ Bool $ suffix `T.isSuffixOf` str
+hsonEndsWith (String _) [arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonEndsWith _ args = throwError $ ArgumentCount 1 args
+
+hsonReplace :: MethodDefinition
+hsonReplace (String haystack) [String needle, String replacement] = return $ String $ T.replace needle replacement haystack
+hsonReplace (String _) [String _, arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonReplace (String _) [arg, _] = throwError $ UnexpectedType "string" (showType arg)
+hsonReplace _ args = throwError $ ArgumentCount 2 args

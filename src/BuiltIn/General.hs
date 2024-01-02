@@ -2,6 +2,7 @@
 
 module BuiltIn.General where
 
+import BuiltIn.Function (toJSON)
 import BuiltIn.Helpers
 import Control.Monad.Except
 import qualified Data.Aeson as A
@@ -27,17 +28,8 @@ hsonToString this [] = return $ String $ showValue this
 hsonToString _ args = throwError $ ArgumentCount 0 args
 
 hsonToJSON :: MethodDefinition
-hsonToJSON this [] = case T.decodeUtf8' $ A.encode this of
-  Left err -> throwError $ JSONEncodingError err
-  Right t -> return $ String $ T.toStrict t
-hsonToJSON this [Number n] = do
-  spaces <- intFromNumber n
-  case T.decodeUtf8' $
-    AP.encodePretty'
-      (encodePrettyConfig spaces)
-      this of
-    Left err -> throwError $ JSONEncodingError err
-    Right t -> return $ String $ T.toStrict t
+hsonToJSON this [Number n] = toJSON [this, Number n]
+hsonToJSON this [] = toJSON [this]
 hsonToJSON _ [arg] = throwError $ UnexpectedType "number" (showType arg)
 hsonToJSON _ args = throwError $ VariadicArgCount 0 1 args
 
