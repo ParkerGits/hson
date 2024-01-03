@@ -38,10 +38,16 @@ isTruthy _ = True
 inBounds :: Int -> V.Vector HSONValue -> Bool
 inBounds i arr = i >= 0 && i < V.length arr
 
+-- Wraps negative index n such that n refers to the same index as length+n;
+-- throws if n is not an integer.
 indexFromNumber :: Scientific -> HSONValue -> Eval Int
-indexFromNumber n (Array arr) = do
+indexFromNumber n (Array arr) = clampIndex n (V.length arr)
+indexFromNumber n (String str) = clampIndex n (T.length str)
+
+clampIndex :: Scientific -> Int -> Eval Int
+clampIndex n len = do
   index <- intFromNumber n
-  return $ if index >= 0 then index else index + V.length arr
+  return $ if index >= 0 then index else index + len
 
 intFromNumber :: Scientific -> Eval Int
 intFromNumber n =

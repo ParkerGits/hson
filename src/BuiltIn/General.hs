@@ -4,6 +4,7 @@ module BuiltIn.General where
 
 import BuiltIn.Function (toJSON)
 import BuiltIn.Helpers
+import Control.Exception
 import Control.Monad.Except
 import qualified Data.Aeson as A
 import Data.Aeson.Encode.Pretty (defConfig)
@@ -33,6 +34,7 @@ hsonToJSON this [] = toJSON [this]
 hsonToJSON _ [arg] = throwError $ UnexpectedType "number" (showType arg)
 hsonToJSON _ args = throwError $ VariadicArgCount 0 1 args
 
+-- Returns the value at the index n. If n is negative, the checked index is index + n. If n is out of bounds, returns Null.
 hsonAt :: MethodDefinition
 hsonAt this [Number n] = do
   idx <- indexFromNumber n this
@@ -40,6 +42,11 @@ hsonAt this [Number n] = do
     Array arr -> case arr V.!? idx of
       Just v -> return v
       Nothing -> return Null
+    String str -> do
+      result <- liftIO $ try $ evaluate $ T.index str idx
+      case result :: Either SomeException Char of
+        Right result -> return $ String $ T.singleton result
+        Left _ -> return Null
 hsonAt _ [arg] = throwError $ UnexpectedType "number" (showType arg)
 hsonAt _ args = throwError $ ArgumentCount 1 args
 
