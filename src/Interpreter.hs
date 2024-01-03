@@ -6,6 +6,7 @@ import BuiltIn.Array
 import BuiltIn.Function (builtInFunctions)
 import BuiltIn.Helpers
 import BuiltIn.String
+import Control.Exception (SomeException, evaluate, try)
 import Control.Monad.Except (
   MonadError (throwError),
   catchError,
@@ -173,6 +174,9 @@ access tok value@(Number idx) (Array arr) = case floatingOrInteger idx of
   Left float -> throwError $ InvalidIndex tok value "array"
 access tok (String name) (Array arr) = accessArrayMethod tok name arr
 access tok (String name) (String str) = accessStringMethod tok name str
+access tok value@(Number idx) (String str) = case floatingOrInteger idx of
+  Right int -> accessStringIdx tok int str
+  Left float -> throwError $ InvalidIndex tok value "string"
 access tok value indexed = throwError $ InvalidIndex tok value (showType indexed)
 
 accessObjectProp ::
@@ -196,3 +200,10 @@ accessStringMethod :: Token -> T.Text -> T.Text -> Eval HSONValue
 accessStringMethod tok name str = case Map.lookup name stringMethods of
   Just (Method f) -> return $ Function $ f (String str)
   Nothing -> throwError $ UndefinedProperty name tok
+
+accessStringIdx :: Token -> Int -> T.Text -> Eval HSONValue
+accessStringIdx tok idx str = do
+  result <- liftIO $ try $ evaluate $ T.index str idx
+  case result :: Either SomeException Char of
+    Right result -> return $ String $ T.singleton result
+    Left _ -> throwError $ IndexOutOfBounds tok idx
