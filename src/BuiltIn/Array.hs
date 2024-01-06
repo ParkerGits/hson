@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module BuiltIn.Array where
 
 import BuiltIn.Function
 import BuiltIn.Helpers
+import BuiltIn.TH (test2)
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Data.List
@@ -14,31 +16,6 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Algorithms.Intro as VA
 import qualified Data.Vector.Generic as MV
 import HSONValue
-
-arrayMethods :: Map.Map T.Text HSONValue
-arrayMethods =
-  Map.fromList
-    [ ("length", mkMethod arrayLength)
-    , ("at", mkMethod arrayAt)
-    , ("map", mkMethod arrayMap)
-    , ("filter", mkMethod arrayFilter)
-    , ("reduce", mkMethod arrayReduce)
-    , ("every", mkMethod arrayEvery)
-    , ("some", mkMethod arraySome)
-    , ("find", mkMethod arrayFind)
-    , ("sort", mkMethod arraySort)
-    , ("insert", mkMethod arrayInsert)
-    , ("splice", mkMethod arraySplice)
-    , ("push", mkMethod arrayPush)
-    , ("unshift", mkMethod arrayUnshift)
-    , ("pop", mkMethod arrayPop)
-    , ("shift", mkMethod arrayShift)
-    , ("with", mkMethod arrayWith)
-    , ("join", mkMethod arrayJoin)
-    , ("reverse", mkMethod arrayReverse)
-    , ("toString", mkMethod arrayToString)
-    , ("toJSON", mkMethod arrayToJSON)
-    ]
 
 arrayLength :: MethodDefinition
 arrayLength this [] = hsonLength [this]
@@ -55,12 +32,13 @@ arrayToJSON _ [arg] = throwError $ UnexpectedType "number" (showType arg)
 arrayToJSON _ args = throwError $ VariadicArgCount 0 1 args
 
 arrayAt :: MethodDefinition
-arrayAt this [Number n] = hsonToJSON [this, Number n]
+arrayAt this [Number n] = hsonAt [this, Number n]
 arrayAt _ [arg] = throwError $ UnexpectedType "number" (showType arg)
 arrayAt _ args = throwError $ ArgumentCount 1 args
+-- $(test "arrayAt" ['Number] 'hsonAt)
 
 arrayReverse :: MethodDefinition
-arrayReverse this [] = hsonToJSON [this]
+arrayReverse this [] = hsonReverse [this]
 arrayReverse _ args = throwError $ ArgumentCount 0 args
 
 arrayMap :: MethodDefinition
@@ -160,3 +138,28 @@ arrayPop _ args = throwError $ ArgumentCount 0 args
 arrayShift :: MethodDefinition
 arrayShift (Array arr) [] = return $ Array $ V.tail arr
 arrayShift _ args = throwError $ ArgumentCount 0 args
+
+arrayMethods :: Map.Map T.Text HSONValue
+arrayMethods =
+  Map.fromList
+    [ ("length", mkMethod arrayLength)
+    , ("at", mkMethod arrayAt)
+    , ("map", mkMethod arrayMap)
+    , ("filter", mkMethod arrayFilter)
+    , ("reduce", mkMethod arrayReduce)
+    , ("every", mkMethod arrayEvery)
+    , ("some", mkMethod arraySome)
+    , ("find", mkMethod arrayFind)
+    , ("sort", mkMethod arraySort)
+    , ("insert", mkMethod arrayInsert)
+    , ("splice", mkMethod arraySplice)
+    , ("push", mkMethod arrayPush)
+    , ("unshift", mkMethod arrayUnshift)
+    , ("pop", mkMethod arrayPop)
+    , ("shift", mkMethod arrayShift)
+    , ("with", mkMethod arrayWith)
+    , ("join", mkMethod arrayJoin)
+    , ("reverse", mkMethod arrayReverse)
+    , ("toString", mkMethod arrayToString)
+    , ("toJSON", mkMethod arrayToJSON)
+    ]
