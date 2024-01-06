@@ -23,7 +23,6 @@ extra-source-files: CHANGELOG.md
 
 library
     exposed-modules:
-      BuiltIn.General,
       BuiltIn.Array,
       BuiltIn.Helpers,
       BuiltIn.String,

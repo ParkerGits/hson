@@ -2,7 +2,6 @@
 
 module BuiltIn.String where
 
-import BuiltIn.General
 import BuiltIn.Helpers
 import Control.Monad.Error.Class
 import qualified Data.Map as Map
@@ -13,13 +12,14 @@ import HSONValue
 stringMethods :: Map.Map T.Text HSONValue
 stringMethods =
   Map.fromList
-    [ ("length", mkMethod hsonLength)
-    , ("at", mkMethod hsonAt)
-    , ("reverse", mkMethod hsonReverse)
-    , ("toString", mkMethod hsonToString)
-    , ("toJSON", mkMethod hsonToJSON)
-    , ("includes", mkMethod hsonIncludes)
-    , ("split", mkMethod hsonSplit)
+    -- [ ("length", mkMethod hsonLength)
+    -- , ("at", mkMethod hsonAt)
+    -- , ("reverse", mkMethod hsonReverse)
+    -- , ("toString", mkMethod hsonToString)
+    -- , ("toJSON", mkMethod hsonToJSON)
+    -- , ("includes", mkMethod hsonIncludes)
+
+    [ ("split", mkMethod hsonSplit)
     , ("words", mkMethod hsonWords)
     , ("lines", mkMethod hsonLines)
     , ("startsWith", mkMethod hsonStartsWith)

@@ -3,7 +3,6 @@
 module BuiltIn.Array where
 
 import BuiltIn.Function
-import BuiltIn.General
 import BuiltIn.Helpers
 import Control.Monad.Except
 import Control.Monad.Reader.Class
@@ -65,7 +64,7 @@ arrayReverse this [] = hsonToJSON [this]
 arrayReverse _ args = throwError $ ArgumentCount 0 args
 
 arrayMap :: MethodDefinition
-arrayMap (Array arr) [Lambda (Func f) env] = Array <$> local (const env) (V.mapM (f . singleton) arr)
+arrayMap (Array arr) [Lambda (Func f) env] = hsonMap [Array arr, Lambda (Func f) env]
 arrayMap _ [arg] = throwError $ UnexpectedType "lambda" (showType arg)
 arrayMap _ args = throwError $ ArgumentCount 1 args
 
@@ -125,19 +124,9 @@ arrayInsert (Array arr) [arg, _] = throwError $ UnexpectedType "integer" (showTy
 arrayInsert _ args = throwError $ ArgumentCount 2 args
 
 arraySplice :: MethodDefinition
-arraySplice (Array arr) [Number n] = do
-  index <- indexFromNumber n (Array arr)
-  return $ Array $ V.take index arr
-arraySplice (Array arr) [Number idx, Number n] = do
-  index <- indexFromNumber idx (Array arr)
-  dropCount <- intFromNumber n
-  let (x, y) = V.splitAt index arr
-   in return $ Array $ x <> V.drop dropCount y
-arraySplice (Array arr) [Number idx, Number n, Array inserts] = do
-  index <- indexFromNumber idx (Array arr)
-  dropCount <- intFromNumber n
-  let (x, y) = V.splitAt index arr
-   in return $ Array $ x <> inserts <> V.drop dropCount y
+arraySplice (Array arr) [Number n] = hsonSplice [Array arr, Number n]
+arraySplice (Array arr) [Number idx, Number n] = hsonSplice [Array arr, Number idx, Number n]
+arraySplice (Array arr) [Number idx, Number n, Array inserts] = hsonSplice [Array arr, Number idx, Array inserts]
 arraySplice (Array arr) (Number _ : Number _ : arg : _) = throwError $ UnexpectedType "array" (showType arg)
 arraySplice (Array arr) (Number _ : arg : _) = throwError $ UnexpectedType "integer" (showType arg)
 arraySplice (Array arr) (arg : _) = throwError $ UnexpectedType "integer" (showType arg)

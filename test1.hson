@@ -1,2 +1,1 @@
-let str = "test";
-str.at(-1)
+[1,2,3] |> map(|| => 4)
