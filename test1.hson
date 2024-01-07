@@ -1,8 +1,2 @@
-let filterByStartsWith = |data, name| =>
-  data
-    |> filter(|result| => result.name.startsWith(name))
-    |> map (|result| => result.name)
-    |> toJSON(2);
-
-$.results
-  |> filterByStartsWith("pa")
+let c = {"hello world": "test"};
+c["hello world"]

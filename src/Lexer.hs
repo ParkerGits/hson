@@ -7,7 +7,7 @@ import Control.Monad.Identity (Identity)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.Reader.Class (MonadReader)
 import qualified Data.Map as Map
-import Data.Scientific (Scientific)
+import Data.Scientific (Scientific, fromFloatDigits)
 import qualified Data.Text as T (Text, pack, unpack)
 import HSONValue
 import Text.Parsec (
@@ -67,8 +67,8 @@ type HSONParser = ParsecT T.Text () Identity
 
 tokenReservedOp :: TokenType -> String -> HSONParser Token
 tokenReservedOp tt s = do
-  P.reservedOp hsonLexer s
   pos <- getPosition
+  P.reservedOp hsonLexer s
   return Token{tokenType = tt, literal = Nothing, pos = pos}
 
 tokenReserved :: TokenType -> String -> HSONParser Token
@@ -131,6 +131,40 @@ tokenNull = tokenReserved TokenNull "null"
 
 tokenDollar = tokenReserved TokenDollar "$"
 
+tokenNumber = do
+  pos <- getPosition
+  lit <- numberLiteral
+  return
+    Token
+      { tokenType = TokenNumber
+      , literal = Just $ Number $ toScientific lit
+      , pos = pos
+      }
+ where
+  toScientific n = case n of
+    Right d -> fromFloatDigits d
+    Left i -> fromInteger i
+
+tokenString = do
+  pos <- getPosition
+  lit <- stringLiteral
+  return
+    Token
+      { tokenType = TokenString
+      , literal = Just $ String $ T.pack lit
+      , pos = pos
+      }
+
+identifier = do
+  pos <- getPosition
+  name <- P.identifier hsonLexer
+  return
+    Token
+      { tokenType = TokenIdentifier
+      , literal = Just $ String $ T.pack name
+      , pos = pos
+      }
+
 parens = P.parens hsonLexer
 
 numberLiteral = P.naturalOrFloat hsonLexer
@@ -155,13 +189,3 @@ symbol = P.symbol hsonLexer
 
 pipes =
   between (symbol "|") (symbol "|")
-
-identifier = do
-  name <- P.identifier hsonLexer
-  pos <- getPosition
-  return
-    Token
-      { tokenType = TokenIdentifier
-      , literal = Just $ String $ T.pack name
-      , pos = pos
-      }

@@ -384,7 +384,7 @@ keyValues = do
   commaSep keyValue
  where
   keyValue = do
-    k <- identifier
+    k <- try tokenString <|> identifier
     colon
     v <- expression
     return (k, v)

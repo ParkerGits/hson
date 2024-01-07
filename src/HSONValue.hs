@@ -193,6 +193,8 @@ data TokenType
   | TokenLeftBrace
   | TokenLeftBracket
   | TokenLeftParen
+  | TokenString
+  | TokenNumber
   | TokenIdentifier
   | TokenLet
   | TokenSemicolon
