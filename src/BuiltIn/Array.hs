@@ -1,11 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module BuiltIn.Array where
 
 import BuiltIn.Function
 import BuiltIn.Helpers
-import BuiltIn.TH (test2)
 import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Data.List

@@ -48,6 +48,13 @@ builtInFunctions =
     , ("unshift", mkFunction hsonUnshift)
     , ("pop", mkFunction hsonPop)
     , ("shift", mkFunction hsonShift)
+    , ("includes", mkFunction hsonIncludes)
+    , ("split", mkFunction hsonSplit)
+    , ("words", mkFunction hsonWords)
+    , ("lines", mkFunction hsonLines)
+    , ("startsWith", mkFunction hsonStartsWith)
+    , ("endsWith", mkFunction hsonEndsWith)
+    , ("replace", mkFunction hsonReplace)
     ]
 
 keys :: FunctionDefinition
@@ -237,3 +244,42 @@ hsonShift :: FunctionDefinition
 hsonShift [Array arr] = return $ Array $ V.tail arr
 hsonShift [arg] = throwError $ UnexpectedType "array" (showType arg)
 hsonShift args = throwError $ ArgumentCount 1 args
+
+hsonIncludes :: FunctionDefinition
+hsonIncludes [String haystack, String needle] = return $ Bool $ needle `T.isInfixOf` haystack
+hsonIncludes [String _, arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonIncludes [arg, _] = throwError $ UnexpectedType "string" (showType arg)
+hsonIncludes args = throwError $ ArgumentCount 2 args
+
+hsonSplit :: FunctionDefinition
+hsonSplit [String str, String splitter] = return $ Array $ V.map String $ V.fromList $ T.splitOn splitter str
+hsonSplit [String _, arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonSplit [arg, _] = throwError $ UnexpectedType "string" (showType arg)
+hsonSplit args = throwError $ ArgumentCount 2 args
+
+hsonWords :: FunctionDefinition
+hsonWords [String str] = return $ Array $ V.map String $ V.fromList $ T.words str
+hsonWords args = throwError $ ArgumentCount 1 args
+
+hsonLines :: FunctionDefinition
+hsonLines [String str] = return $ Array $ V.map String $ V.fromList $ T.lines str
+hsonLines args = throwError $ ArgumentCount 1 args
+
+hsonStartsWith :: FunctionDefinition
+hsonStartsWith [String str, String prefix] = return $ Bool $ prefix `T.isPrefixOf` str
+hsonStartsWith [String _, arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonStartsWith [arg, _] = throwError $ UnexpectedType "string" (showType arg)
+hsonStartsWith args = throwError $ ArgumentCount 2 args
+
+hsonEndsWith :: FunctionDefinition
+hsonEndsWith [String str, String suffix] = return $ Bool $ suffix `T.isSuffixOf` str
+hsonEndsWith [String _, arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonEndsWith [arg, _] = throwError $ UnexpectedType "string" (showType arg)
+hsonEndsWith args = throwError $ ArgumentCount 2 args
+
+hsonReplace :: FunctionDefinition
+hsonReplace [String haystack, String needle, String replacement] = return $ String $ T.replace needle replacement haystack
+hsonReplace [String _, String _, arg] = throwError $ UnexpectedType "string" (showType arg)
+hsonReplace [String _, arg, _] = throwError $ UnexpectedType "string" (showType arg)
+hsonReplace [arg, _, _] = throwError $ UnexpectedType "string" (showType arg)
+hsonReplace args = throwError $ ArgumentCount 3 args
