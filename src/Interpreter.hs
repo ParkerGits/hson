@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Interpreter where
 
@@ -6,11 +7,12 @@ import BuiltIn.Array
 import BuiltIn.Function (builtInFunctions)
 import BuiltIn.Helpers
 import BuiltIn.String
-import Control.Exception (SomeException, evaluate, try)
+import Control.Exception (SomeException, evaluate, throw, try)
 import Control.Monad.Except (
   MonadError (throwError),
   catchError,
   runExceptT,
+  when,
  )
 import Control.Monad.IO.Class
 import Control.Monad.Reader (
@@ -42,9 +44,64 @@ runInterpret env prog = runExceptT $ runReaderT (unEval $ interpret prog) env
 
 interpret :: Program -> Eval HSONValue
 interpret ([], expr) = eval expr
-interpret ((VarStmt (Token _ (Just (String name)) _) initializer) : stmts, expr) = do
-  val <- eval initializer
-  local (Map.insert name val) $ interpret (stmts, expr)
+interpret (stmt : stmts, expr) = do
+  case stmt of
+    VarDeclStmt (VarDecl (Token _ (Just (String name)) _) initializer) -> do
+      val <- eval initializer
+      local (Map.insert name val) $ interpret (stmts, expr)
+    ObjectDestructureDeclStmt (ObjectDestructureDecl kvs initializer) -> do
+      val <- eval initializer
+      case val of
+        Object o -> local (Map.union $ bindDestObj kvs o) $ interpret (stmts, expr)
+        v -> throwError $ UnexpectedType "object" (showType v)
+    ArrayDestructureDeclStmt (ArrayDestructureDecl elems initializer) -> do
+      val <- eval initializer
+      case val of
+        Array arr -> local (Map.union $ bindDestArr elems arr) $ interpret (stmts, expr)
+        v -> throwError $ UnexpectedType "array" (showType v)
+
+-- binds the keys in a destructured object to the keys in the provided object
+-- inserts those bindings in the given environment and returns the environment
+bindDestObj ::
+  [(Token, Maybe Token)] -> Map.Map T.Text HSONValue -> Environment
+bindDestObj
+  [ ( tok@(Token TokenIdentifier (Just (String k)) _)
+      , ident
+      )
+    ]
+  o = case ident of
+    Just (Token TokenIdentifier (Just (String name)) _) -> Map.singleton k (fromMaybe Null (Map.lookup k o))
+    Nothing -> Map.singleton k (fromMaybe Null (Map.lookup k o))
+bindDestObj
+  ( ( tok@(Token TokenIdentifier (Just (String k)) _)
+      , ident
+      )
+      : kvs
+    )
+  o = case ident of
+    Just (Token TokenIdentifier (Just (String name)) _) -> Map.insert name (fromMaybe Null (Map.lookup k o)) $ bindDestObj kvs o
+    Nothing -> Map.insert k (fromMaybe Null (Map.lookup k o)) $ bindDestObj kvs o
+bindDestObj
+  [ ( tok@(Token TokenString (Just (String k)) _)
+      , Just (Token TokenIdentifier (Just (String ident)) _)
+      )
+    ]
+  o = Map.singleton ident (fromMaybe Null (Map.lookup k o))
+bindDestObj
+  ( ( tok@(Token TokenString (Just (String k)) _)
+      , Just (Token TokenIdentifier (Just (String ident)) _)
+      )
+      : kvs
+    )
+  o = Map.insert ident (fromMaybe Null (Map.lookup k o)) $ bindDestObj kvs o
+
+bindDestArr :: [Token] -> V.Vector HSONValue -> Environment
+bindDestArr elems arr = zipBind (map toIdent elems) (V.toList arr)
+
+zipBind :: [T.Text] -> [HSONValue] -> Environment
+zipBind [] values = Map.empty
+zipBind idents [] = Map.fromList $ map (,Null) idents
+zipBind (ident : idents) (value : values) = Map.insert ident value $ zipBind idents values
 
 eval :: Expr -> Eval HSONValue
 eval (ArrowFunctionExpr (ArrowFunction params body)) = toLambda params body
@@ -147,10 +204,16 @@ minusValue :: Token -> HSONValue -> Eval HSONValue
 minusValue _ (Number v) = return $ Number $ -1 * v
 minusValue opTok _ = throwError $ TypeError opTok "operand must be a number"
 
-evalEntry :: (Token, Expr) -> Eval (T.Text, HSONValue)
-evalEntry (Token _ (Just (String k)) _, exp) = do
-  v <- eval exp
-  return (k, v)
+evalEntry :: (Token, Maybe Expr) -> Eval (T.Text, HSONValue)
+evalEntry (tok@(Token _ (Just (String k)) _), exp) = case exp of
+  Just e -> do
+    v <- eval e
+    return (k, v)
+  Nothing -> do
+    binding <- asks (Map.lookup k)
+    case binding of
+      Just v -> return (k, v)
+      Nothing -> throwError $ UndefinedVariable tok
 
 toLambda :: [Token] -> Expr -> Eval HSONValue
 toLambda params expr = asks (Lambda . Func $ \args -> toLambda' params expr args)

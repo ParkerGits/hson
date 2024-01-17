@@ -12,6 +12,7 @@ import qualified Data.Vector as V
 import HSONValue
 import Lexer
 import Text.Parsec (
+  ParseError,
   ParsecT,
   SourcePos,
   alphaNum,
@@ -20,11 +21,13 @@ import Text.Parsec (
   getState,
   letter,
   oneOf,
+  optionMaybe,
   putState,
   runParserT,
   sourceLine,
   string,
   try,
+  (<?>),
  )
 import Text.ParserCombinators.Parsec (
   chainl1,
@@ -40,9 +43,27 @@ import Text.ParserCombinators.Parsec (
   (<|>),
  )
 
-data VarStmt = VarStmt
+data VarStmt
+  = VarDeclStmt VarDecl
+  | ObjectDestructureDeclStmt ObjectDestructureDecl
+  | ArrayDestructureDeclStmt ArrayDestructureDecl
+  deriving (Show)
+
+data VarDecl = VarDecl
   { declName :: Token
   , initializer :: Expr
+  }
+  deriving (Show)
+
+data ObjectDestructureDecl = ObjectDestructureDecl
+  { destKv :: [(Token, Maybe Token)]
+  , destObj :: Expr
+  }
+  deriving (Show)
+
+data ArrayDestructureDecl = ArrayDestructureDecl
+  { destElems :: [Token]
+  , destArr :: Expr
   }
   deriving (Show)
 
@@ -131,7 +152,7 @@ data Logical = Logical
 
 data ObjectInitializer = ObjectInitializer
   { brace :: Token
-  , entries :: [(Token, Expr)]
+  , entries :: [(Token, Maybe Expr)]
   }
   deriving (Show)
 
@@ -146,19 +167,52 @@ newtype Variable = Variable {varName :: Token}
 
 program :: HSONParser Program
 program = do
-  declarations <- many varDecl
+  declarations <- many varStmt
   expr <- expression
   eof
   return (declarations, expr)
 
-varDecl :: HSONParser VarStmt
-varDecl = do
+varStmt :: HSONParser VarStmt
+varStmt = do
   letVar
-  declName <- identifier
+  stmt <- try parseVarDecl <|> try parseObjDestDecl <|> parseArrDestDecl
   equal
   initializer <- expression
   semicolon
-  return VarStmt{declName = declName, initializer = initializer}
+  return $ stmt initializer
+
+parseVarDecl :: HSONParser (Expr -> VarStmt)
+parseVarDecl = do
+  declName <- identifier
+  return $ \expr -> VarDeclStmt VarDecl{declName = declName, initializer = expr}
+
+parseObjDestDecl :: HSONParser (Expr -> VarStmt)
+parseObjDestDecl = do
+  kv <- braces keyValues
+  return $ \expr ->
+    ObjectDestructureDeclStmt
+      ObjectDestructureDecl{destKv = kv, destObj = expr}
+ where
+  keyValues = do
+    commaSep (try identKeyValue <|> stringKeyValue)
+   where
+    identKeyValue = do
+      k <- identifier
+      v <- optionMaybe $ do
+        colon
+        identifier
+      return (k, v)
+    stringKeyValue = do
+      k <- tokenString
+      colon
+      v <- identifier
+      return (k, Just v)
+
+parseArrDestDecl :: HSONParser (Expr -> VarStmt)
+parseArrDestDecl = do
+  elems <- brackets $ commaSep identifier
+  return $ \expr ->
+    ArrayDestructureDeclStmt ArrayDestructureDecl{destElems = elems, destArr = expr}
 
 expression :: HSONParser Expr
 expression = pipeForward
@@ -248,7 +302,7 @@ factor = do
   parseDiv = parseBinaryOp slash
 
 unary :: HSONParser Expr
-unary = try parseUnary <|> call
+unary = try parseUnary <|> try call <?> "expression"
 
 call :: HSONParser Expr
 call = do
@@ -272,7 +326,8 @@ primary =
     <|> try parseArray
     <|> try parseObject
     <|> try parseGrouping
-    <|> parseArrowFunction
+    <|> try parseArrowFunction
+    <?> "expression"
 
 parseUnary :: HSONParser Expr
 -- Parse a unary operation, then apply it to the next unary expression
@@ -281,6 +336,12 @@ parseUnary = (try parseBangBang <|> try parseBang <|> parseMinus) <*> unary
   parseBangBang = parseUnaryOp bangBang
   parseBang = parseUnaryOp bang
   parseMinus = parseUnaryOp minus
+
+parseGet :: HSONParser (Expr -> Expr)
+parseGet = do
+  dot
+  property <- identifier
+  return $ \object -> GetExpr Get{object = object, property = property}
 
 parseCall :: HSONParser (Expr -> Expr)
 parseCall = do
@@ -306,12 +367,6 @@ parseIndex = do
         , indexed = indexed
         , index = idx
         }
-
-parseGet :: HSONParser (Expr -> Expr)
-parseGet = do
-  dot
-  property <- identifier
-  return $ \object -> GetExpr Get{object = object, property = property}
 
 parseNumber :: HSONParser Expr
 parseNumber = do
@@ -371,23 +426,25 @@ parseArray = do
 parseObject :: HSONParser Expr
 parseObject = do
   bracePos <- getPosition
-  entries <- braces keyValues
+  entries <- braces entries
   return $
     ObjectInitializerExpr
       ObjectInitializer
         { brace = Token{tokenType = TokenLeftBrace, literal = Nothing, pos = bracePos}
         , entries = entries
         }
-
-keyValues :: HSONParser [(Token, Expr)]
-keyValues = do
-  commaSep keyValue
  where
-  keyValue = do
-    k <- try tokenString <|> identifier
-    colon
-    v <- expression
-    return (k, v)
+  entries = do
+    commaSep (try keyValue <|> key)
+   where
+    keyValue = do
+      k <- try tokenString <|> identifier
+      colon
+      v <- expression
+      return (k, Just v)
+    key = do
+      k <- identifier
+      return (k, Nothing)
 
 parseLogicalOp :: HSONParser Token -> HSONParser (Expr -> Expr -> Expr)
 parseLogicalOp op = do
@@ -408,4 +465,5 @@ parseUnaryOp op = do
   pos <- getPosition
   return (\r -> UnaryExpr Unary{unaryOp = unaryOp, unaryRight = r})
 
+parseHSON :: T.Text -> Either ParseError Program
 parseHSON s = runIdentity $ runParserT program () "" s

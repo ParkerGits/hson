@@ -1,2 +1,2 @@
-let c = {"hello world": "test"};
-c["hello world"]
+let z = {hello: "world"};
+{z}
