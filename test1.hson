@@ -1,2 +1,5 @@
 let z = {hello: "world"};
-{z}
+let { hello: world } = z;
+let arr = [1,2,{hey: "guys"}];
+let [a,b] = arr;
+{z, world, a}

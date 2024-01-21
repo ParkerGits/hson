@@ -74,8 +74,8 @@ data Expr
   | CallExpr Call
   | ConditionalExpr Conditional
   | DollarExpr Dollar
-  | GroupingExpr Grouping
   | GetExpr Get
+  | GroupingExpr Grouping
   | IndexExpr Index
   | LiteralExpr Literal
   | LogicalExpr Logical
@@ -128,6 +128,9 @@ data Get = Get
   }
   deriving (Show)
 
+newtype Grouping = Grouping {groupingExpr :: Expr}
+  deriving (Show)
+
 data Index = Index
   { -- The expression being indexed
     indexed :: Expr
@@ -137,10 +140,7 @@ data Index = Index
   }
   deriving (Show)
 
-newtype Grouping = Grouping {groupingExpr :: Expr}
-  deriving (Show)
-
-newtype Literal = Literal {value :: HSONValue}
+newtype Literal = Literal {litTok :: Token}
   deriving (Show)
 
 data Logical = Logical
@@ -369,28 +369,26 @@ parseIndex = do
         }
 
 parseNumber :: HSONParser Expr
-parseNumber = do
-  n <- numberLiteral
-  return $ LiteralExpr Literal{value = Number $ toScientific n}
+parseNumber = LiteralExpr . Literal <$> tokenNumber
  where
   toScientific n = case n of
     Right d -> fromFloatDigits d
     Left i -> fromInteger i
 
 parseString :: HSONParser Expr
-parseString = LiteralExpr . Literal . String . T.pack <$> stringLiteral
+parseString = LiteralExpr . Literal <$> tokenString
 
 parseDollar :: HSONParser Expr
 parseDollar = DollarExpr . Dollar <$> tokenDollar
 
 parseFalse :: HSONParser Expr
-parseFalse = tokenFalse $> LiteralExpr Literal{value = Bool False}
+parseFalse = LiteralExpr . Literal <$> tokenFalse
 
 parseTrue :: HSONParser Expr
-parseTrue = tokenTrue $> LiteralExpr Literal{value = Bool True}
+parseTrue = LiteralExpr . Literal <$> tokenTrue
 
 parseNull :: HSONParser Expr
-parseNull = tokenNull $> LiteralExpr Literal{value = Null}
+parseNull = LiteralExpr . Literal <$> tokenNull
 
 parseIdent :: HSONParser Expr
 parseIdent = VariableExpr . Variable <$> identifier

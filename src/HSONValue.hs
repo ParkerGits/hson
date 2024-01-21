@@ -203,7 +203,6 @@ data TokenType
   | TokenTrue
   | TokenFalse
   | TokenNull
-  | TokenBackslash
   | TokenArrow
   | TokenDollar
   | TokenBangBang

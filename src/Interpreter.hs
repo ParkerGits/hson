@@ -148,7 +148,7 @@ eval (IndexExpr (Index indexed tok index)) = do
   object <- eval indexed
   idx <- eval index
   access tok idx object
-eval (LiteralExpr (Literal v)) = return v
+eval (LiteralExpr (Literal (Token _ (Just v) _))) = return v
 eval (LogicalExpr (Logical l opTok r)) = do
   left <- eval l
   right <- eval r

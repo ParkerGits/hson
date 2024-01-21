@@ -6,6 +6,7 @@ data Options = Options
   { hsonInputOpt :: HSONInput
   , jsonInputOpt :: JSONInput
   , doPrintAst :: Bool
+  , doOmitEval :: Bool
   }
 
 data HSONInput
@@ -23,6 +24,7 @@ opts =
     <$> (hsonFileInput <|> cmdLineIn)
     <*> (jsonFileInput <|> stdin)
     <*> printParseTree
+    <*> hideEval
 
 hsonFileInput :: Parser HSONInput
 hsonFileInput =
@@ -62,6 +64,13 @@ printParseTree =
     False
     True
     (long "print-hson-ast" <> short 'p' <> help "Print the HSON parse tree")
+
+hideEval :: Parser Bool
+hideEval =
+  flag
+    False
+    True
+    (long "omit-eval" <> short 'o' <> help "Omit the evaluated expression output")
 
 testOpts =
   execParser $

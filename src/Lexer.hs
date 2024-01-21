@@ -115,8 +115,6 @@ star = tokenReservedOp TokenStar "*"
 
 slash = tokenReservedOp TokenSlash "/"
 
-tokenBackslash = tokenReservedOp TokenBackslash "\\"
-
 tokenArrow = tokenReservedOp TokenArrow "=>"
 
 tokenPipeForward = tokenReservedOp TokenPipeForward "|>"
