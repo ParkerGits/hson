@@ -52,6 +52,8 @@ library
      optparse-applicative,
      parsec,
      pretty,
+     QuickCheck,
+     quickcheck-instances,
      scientific,
      template-haskell,
      text,
