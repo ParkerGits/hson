@@ -10,16 +10,17 @@ import JSONParser
 import Opts (
   HSONInput (CmdLineIn, HSONFileInput),
   JSONInput (JSONFileInput, NoJSONInput, StdIn),
-  Options (doOmitEval, doPrintAst),
+  Options (doOmitEval, doPrettyPrint, doPrintAst),
  )
 import Parser
 import PrettyPrinter (prettyPrintProg)
 
 run :: Maybe BL.ByteString -> T.Text -> Options -> IO ()
-run json hson opts = case parseHSON hson of
+run json hson opts = case runHSONParser hson of
   Left err -> print err
   Right prog -> do
-    when (doPrintAst opts) (TIO.putStrLn $ prettyPrintProg prog)
+    when (doPrintAst opts) (TIO.putStrLn $ T.pack $ show prog)
+    when (doPrettyPrint opts) (TIO.putStrLn $ prettyPrintProg prog)
     unless (doOmitEval opts) (runProg json prog)
 
 runProg :: Maybe BL.ByteString -> Program -> IO ()

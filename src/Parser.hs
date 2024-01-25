@@ -9,6 +9,7 @@ import qualified Data.Map as Map
 import Data.Scientific (Scientific, fromFloatDigits)
 import qualified Data.Text as T (Text, pack, unpack)
 import qualified Data.Vector as V
+import GHC.Generics (Generic)
 import HSONValue
 import Lexer
 import Text.Parsec (
@@ -82,7 +83,7 @@ data Expr
   | ObjectInitializerExpr ObjectInitializer
   | UnaryExpr Unary
   | VariableExpr Variable
-  deriving (Show)
+  deriving (Show, Eq)
 
 type Program = ([VarStmt], Expr)
 
@@ -90,46 +91,46 @@ data ArrayInitializer = ArrayInitializer
   { bracket :: Token
   , elements :: [Expr]
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ArrowFunction = ArrowFunction
   { params :: [Token]
   , body :: Expr
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Binary = Binary
   { binLeft :: Expr
   , binOp :: Token
   , binRight :: Expr
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Call = Call
   { callee :: Expr
   , paren :: Token
   , args :: [Expr]
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Conditional = Conditional
   { condition :: Expr
   , matched :: Expr
   , unmatched :: Expr
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 newtype Dollar = Dollar {dollarTok :: Token}
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Get = Get
   { object :: Expr
   , property :: Token
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 newtype Grouping = Grouping {groupingExpr :: Expr}
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Index = Index
   { -- The expression being indexed
@@ -138,32 +139,32 @@ data Index = Index
   , -- The index
     index :: Expr
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 newtype Literal = Literal {litTok :: Token}
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Logical = Logical
   { logiLeft :: Expr
   , logiOp :: Token
   , logiRight :: Expr
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ObjectInitializer = ObjectInitializer
   { brace :: Token
   , entries :: [(Token, Maybe Expr)]
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Unary = Unary
   { unaryOp :: Token
   , unaryRight :: Expr
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 newtype Variable = Variable {varName :: Token}
-  deriving (Show)
+  deriving (Show, Eq)
 
 program :: HSONParser Program
 program = do
@@ -463,5 +464,14 @@ parseUnaryOp op = do
   pos <- getPosition
   return (\r -> UnaryExpr Unary{unaryOp = unaryOp, unaryRight = r})
 
-parseHSON :: T.Text -> Either ParseError Program
-parseHSON s = runIdentity $ runParserT program () "" s
+runHSONParser :: T.Text -> Either ParseError Program
+runHSONParser s = runHSONParser' s program
+
+runHSONExprParser :: T.Text -> Either ParseError Expr
+runHSONExprParser s = runHSONParser' s expression
+
+runHSONVarStmtParser :: T.Text -> Either ParseError VarStmt
+runHSONVarStmtParser s = runHSONParser' s varStmt
+
+runHSONParser' :: T.Text -> HSONParser a -> Either ParseError a
+runHSONParser' s p = runIdentity $ runParserT p () "" s

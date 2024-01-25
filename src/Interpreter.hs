@@ -149,6 +149,9 @@ eval (IndexExpr (Index indexed tok index)) = do
   idx <- eval index
   access tok idx object
 eval (LiteralExpr (Literal (Token _ (Just v) _))) = return v
+eval (LiteralExpr (Literal (Token TokenTrue _ _))) = return $ Bool True
+eval (LiteralExpr (Literal (Token TokenFalse _ _))) = return $ Bool False
+eval (LiteralExpr (Literal (Token TokenNull _ _))) = return Null
 eval (LogicalExpr (Logical l opTok r)) = do
   left <- eval l
   right <- eval r

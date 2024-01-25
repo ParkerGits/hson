@@ -1,4 +1,4 @@
-module PrettyPrinter where
+module PrettyPrinter (prettyPrintProg, prettyPrintExpr) where
 
 import Data.Scientific
 import qualified Data.Text as T
@@ -32,7 +32,13 @@ hsonStyle :: Style
 hsonStyle = Style{ribbonsPerLine = 1.5, mode = PageMode, lineLength = 80}
 
 prettyPrintProg :: Program -> T.Text
-prettyPrintProg prog = T.pack $ render $ ppProg prog
+prettyPrintProg = prettyPrint ppProg
+
+prettyPrintExpr :: Expr -> T.Text
+prettyPrintExpr = prettyPrint ppExpr
+
+prettyPrint :: (a -> Doc) -> a -> T.Text
+prettyPrint f = T.pack . render . f
 
 ppProg :: Program -> Doc
 ppProg (stmts, expr) = sep [sep $ map ppVarStmt stmts, ppExpr expr]
@@ -58,7 +64,7 @@ ppExpr (CallExpr (Call callee _ args)) = ppExpr callee <> parens (commaSep $ map
 ppExpr (ConditionalExpr (Conditional cond matched unmatched)) = ppExpr cond <+> char '?' <+> ppExpr matched <+> char ':' <+> ppExpr unmatched
 ppExpr (DollarExpr (Dollar tok)) = ppTok tok
 ppExpr (GetExpr (Get obj prop)) = ppExpr obj <> ppTok prop
-ppExpr (GroupingExpr (Grouping expr)) = ppExpr expr
+ppExpr (GroupingExpr (Grouping expr)) = text "(" <> ppExpr expr <> text ")"
 ppExpr (IndexExpr (Index indexed _ index)) = ppExpr indexed <> brackets (ppExpr index)
 ppExpr (LiteralExpr (Literal tok)) = ppTok tok
 ppExpr (LogicalExpr (Logical l op r)) = ppExpr l <+> ppTok op <+> ppExpr r

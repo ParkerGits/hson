@@ -1,5 +1,1 @@
-let z = {hello: "world"};
-let { hello: world } = z;
-let arr = [1,2,{hey: "guys"}];
-let [a,b] = arr;
-{z, world, a}
+false && "hey" || 3 && false

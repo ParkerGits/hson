@@ -30,10 +30,11 @@ instance Show HSONValue where
   show = T.unpack . showValue
 
 instance Eq HSONValue where
-  (==) (String x) (String y) = x == y
-  (==) (Number x) (Number y) = x == y
-  (==) (Bool x) (Bool y) = x == y
-  (==) Null Null = True
+  Array x == Array y = x == y
+  String x == String y = x == y
+  Number x == Number y = x == y
+  Bool x == Bool y = x == y
+  Null == Null = True
   (==) _ _ = False
 
 instance Ord HSONValue where
@@ -93,7 +94,7 @@ showEntry (k, v) = k <> ": " <> showValue v
 
 type Environment = Map.Map T.Text HSONValue
 
-newtype Func = Func {fn :: [HSONValue] -> Eval HSONValue}
+newtype Func = Func {fn :: [HSONValue] -> Eval HSONValue} deriving ()
 
 newtype Eval a = Eval {unEval :: ReaderT Environment (ExceptT HSONError IO) a}
   deriving
@@ -208,7 +209,7 @@ data TokenType
   | TokenBangBang
   | TokenQuestionQuestion
   | TokenPipeForward
-  deriving (Show)
+  deriving (Show, Enum, Eq)
 
 data Token = Token
   { tokenType :: TokenType
@@ -216,3 +217,7 @@ data Token = Token
   , pos :: SourcePos
   }
   deriving (Show)
+
+-- Two tokens are equals if they contain the same TokenType and Literal; pos is not checked!
+instance Eq Token where
+  (Token tta lita _) == (Token ttb litb _) = tta == ttb && lita == litb

@@ -28,6 +28,7 @@ library
       BuiltIn.String,
       BuiltIn.Function,
       BuiltIn.TH,
+      Test.Parser,
       Parser,
       PrettyPrinter,
       Opts,
