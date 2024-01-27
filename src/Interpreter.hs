@@ -106,9 +106,6 @@ zipBind (ident : idents) (value : values) = Map.insert ident value $ zipBind ide
 eval :: Expr -> Eval HSONValue
 eval (ArrowFunctionExpr (ArrowFunction params body)) = toLambda params body
 eval (ArrayInitializerExpr (ArrayInitializer bracketTok elems)) = Array . V.fromList <$> mapM eval elems
-eval (BinaryExpr (Binary l (Token TokenQuestionQuestion _ _) r)) = do
-  left <- eval l
-  if left == Null then eval r else return left
 eval (BinaryExpr (Binary l opTok r)) = do
   left <- eval l
   right <- eval r
@@ -154,10 +151,10 @@ eval (LiteralExpr (Literal (Token TokenFalse _ _))) = return $ Bool False
 eval (LiteralExpr (Literal (Token TokenNull _ _))) = return Null
 eval (LogicalExpr (Logical l opTok r)) = do
   left <- eval l
-  right <- eval r
   case opTok of
-    Token TokenOrOr _ _ -> if isTruthy left then return left else return right
-    Token TokenAndAnd _ _ -> if isTruthy left then return right else return left
+    Token TokenOrOr _ _ -> if isTruthy left then return left else eval r
+    Token TokenAndAnd _ _ -> if isTruthy left then eval r else return left
+    Token TokenQuestionQuestion _ _ -> if left == Null then eval r else return left
     _ -> throwError $ UnhandledOperator opTok
 eval (ObjectInitializerExpr (ObjectInitializer braceTok entries)) = do
   evalEntries <- mapM evalEntry entries

@@ -58,13 +58,13 @@ ppVarStmt (ArrayDestructureDeclStmt (ArrayDestructureDecl elems arr)) =
 
 ppExpr :: Expr -> Doc
 ppExpr (ArrayInitializerExpr (ArrayInitializer _ elems)) = brackets $ commaSep $ map ppExpr elems
-ppExpr (ArrowFunctionExpr (ArrowFunction params body)) = parens (commaSep $ map ppTok params) <+> text "=>" <+> ppExpr body
+ppExpr (ArrowFunctionExpr (ArrowFunction params body)) = pipes (commaSep $ map ppTok params) <+> text "=>" <+> ppExpr body
 ppExpr (BinaryExpr (Binary l op r)) = ppExpr l <+> ppTok op <+> ppExpr r
 ppExpr (CallExpr (Call callee _ args)) = ppExpr callee <> parens (commaSep $ map ppExpr args)
 ppExpr (ConditionalExpr (Conditional cond matched unmatched)) = ppExpr cond <+> char '?' <+> ppExpr matched <+> char ':' <+> ppExpr unmatched
 ppExpr (DollarExpr (Dollar tok)) = ppTok tok
-ppExpr (GetExpr (Get obj prop)) = ppExpr obj <> ppTok prop
-ppExpr (GroupingExpr (Grouping expr)) = text "(" <> ppExpr expr <> text ")"
+ppExpr (GetExpr (Get obj prop)) = ppExpr obj <> char '.' <> ppTok prop
+ppExpr (GroupingExpr (Grouping expr)) = parens $ ppExpr expr
 ppExpr (IndexExpr (Index indexed _ index)) = ppExpr indexed <> brackets (ppExpr index)
 ppExpr (LiteralExpr (Literal tok)) = ppTok tok
 ppExpr (LogicalExpr (Logical l op r)) = ppExpr l <+> ppTok op <+> ppExpr r
@@ -75,7 +75,7 @@ ppExpr (VariableExpr (Variable name)) = ppTok name
 ppTok :: Token -> Doc
 ppTok (Token TokenEqual _ _) = char '='
 ppTok (Token TokenEqualEqual _ _) = text "=="
-ppTok (Token TokenBang _ _) = char '='
+ppTok (Token TokenBang _ _) = char '!'
 ppTok (Token TokenBangEqual _ _) = text "!="
 ppTok (Token TokenAndAnd _ _) = text "&&"
 ppTok (Token TokenOrOr _ _) = text "||"
@@ -122,3 +122,6 @@ ppObjectLiteral entries = sep [lbrace, commaSep $ map ppEntry entries, rbrace]
  where
   ppEntry (tok, Just expr) = (ppTok tok <> colon) <+> ppExpr expr
   ppEntry (tok, Nothing) = ppTok tok
+
+pipes :: Doc -> Doc
+pipes p = char '|' <> p <> char '|'

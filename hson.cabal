@@ -28,7 +28,6 @@ library
       BuiltIn.String,
       BuiltIn.Function,
       BuiltIn.TH,
-      Test.Parser,
       Parser,
       PrettyPrinter,
       Opts,
@@ -53,8 +52,6 @@ library
      optparse-applicative,
      parsec,
      pretty,
-     QuickCheck,
-     quickcheck-instances,
      scientific,
      template-haskell,
      text,
@@ -74,6 +71,23 @@ executable hson
     build-depends:
         base ^>=4.16.4.0,
         hson,
-
     hs-source-dirs:   app
     default-language: Haskell2010
+test-suite hson-parser
+   type:                exitcode-stdio-1.0
+   main-is:             Main.hs
+   hs-source-dirs:      test
+   other-modules:       Arbitrary
+   build-depends:       base >= 4.7 && < 5,
+                        hson,
+                        Cabal,
+                        vector,
+                        parsec,
+                        scientific,
+                        text,
+                        mtl,
+                        QuickCheck,
+                        quickcheck-instances,
+                        containers,
+                        pretty
+  default-language: Haskell2010

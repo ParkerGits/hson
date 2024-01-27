@@ -216,7 +216,10 @@ parseArrDestDecl = do
     ArrayDestructureDeclStmt ArrayDestructureDecl{destElems = elems, destArr = expr}
 
 expression :: HSONParser Expr
-expression = pipeForward
+expression = arrowFunction
+
+arrowFunction :: HSONParser Expr
+arrowFunction = try parseArrowFunction <|> pipeForward
 
 pipeForward :: HSONParser Expr
 pipeForward = do
@@ -258,7 +261,7 @@ nullCoalesce :: HSONParser Expr
 nullCoalesce = do
   chainl1 logicOr parseNullCoalesce
  where
-  parseNullCoalesce = parseBinaryOp questionQuestion
+  parseNullCoalesce = parseLogicalOp questionQuestion
 
 logicOr :: HSONParser Expr
 logicOr = do
@@ -327,8 +330,14 @@ primary =
     <|> try parseArray
     <|> try parseObject
     <|> try parseGrouping
-    <|> try parseArrowFunction
     <?> "expression"
+
+parseArrowFunction :: HSONParser Expr
+parseArrowFunction = do
+  params <- pipes parameters
+  tokenArrow
+  body <- expression
+  return $ ArrowFunctionExpr ArrowFunction{params = params, body = body}
 
 parseUnary :: HSONParser Expr
 -- Parse a unary operation, then apply it to the next unary expression
@@ -396,13 +405,6 @@ parseIdent = VariableExpr . Variable <$> identifier
 
 parseGrouping :: HSONParser Expr
 parseGrouping = GroupingExpr . Grouping <$> parens expression
-
-parseArrowFunction :: HSONParser Expr
-parseArrowFunction = do
-  params <- pipes parameters
-  tokenArrow
-  body <- expression
-  return $ ArrowFunctionExpr ArrowFunction{params = params, body = body}
 
 parameters :: HSONParser [Token]
 parameters = commaSep identifier
