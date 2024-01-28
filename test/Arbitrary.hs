@@ -3,7 +3,8 @@
 module Arbitrary where
 
 import Control.Monad (join, liftM2, liftM3, replicateM)
-import Data.List (singleton)
+import Data.Char (ord)
+import Data.List (singleton, uncons)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe, isNothing, mapMaybe)
 import qualified Data.Text as T
@@ -68,7 +69,12 @@ letter = QC.frequency alphaFreqList
 letterOrDigit :: QC.Gen Char
 letterOrDigit = QC.frequency $ alphaFreqList ++ digitFreqList
 
-safeStringGenerator = T.pack <$> QC.listOf letter
+safeStringGenerator = QC.suchThat (T.pack . QC.getUnicodeString <$> arbitrary) prettyPrintable
+ where
+  -- first 31 ascii characters are not pretty-printed, so avoid them
+  prettyPrintable s = case T.uncons s of
+    Nothing -> True
+    Just (c, s) -> not (T.null s) || (ord c > 31)
 
 identifierGenerator =
   T.pack
@@ -125,37 +131,24 @@ primaryExprGenerator =
     [ LiteralExpr <$> arbitrary
     , DollarExpr <$> arbitrary
     , VariableExpr <$> arbitrary
-    -- , GroupingExpr <$> arbitrary
-    -- , ArrayInitializerExpr <$> arbitrary
-    -- , ObjectInitializerExpr <$> arbitrary
+    , GroupingExpr <$> arbitrary
+    , ArrayInitializerExpr <$> arbitrary
+    , ObjectInitializerExpr <$> arbitrary
     ]
-
--- returns an opTok with equal or higher precedence
-binEqHigherPrecedenceThan :: Token -> QC.Gen (Maybe Token)
-binEqHigherPrecedenceThan = higherPrecedenceThan binOpPrecedence
 
 -- Get the binOpTok
 -- Generate an expression with associated op that is either
 -- 1. a binary expression with higher precedence
 -- 2. a unary expression
 -- 3. a primary expression
-binExprPrecedenceGenerator :: Token -> QC.Gen Expr
-binExprPrecedenceGenerator binOpTok = do
-  higherPrecedenceOp <- binEqHigherPrecedenceThan binOpTok
-  case higherPrecedenceOp of
-    Nothing -> QC.oneof higherPrecedenceExprs
-    Just op -> do
-      l <- binExprPrecedenceGenerator op
-      r <- binExprPrecedenceGenerator op
-      let binExpr = BinaryExpr Binary{binLeft = l, binOp = op, binRight = r}
-       in QC.oneof $
-            return binExpr : higherPrecedenceExprs
- where
-  higherPrecedenceExprs = [UnaryExpr <$> arbitrary, primaryExprGenerator]
-
--- returns an opTok with equal or higher precedence
-logiEqHigherPrecedenceThan :: Token -> QC.Gen (Maybe Token)
-logiEqHigherPrecedenceThan = higherPrecedenceThan logiOpPrecedence
+binExprPrecGenerator :: Token -> QC.Gen Expr
+binExprPrecGenerator =
+  exprPrecGenerator
+    binOpPrecedence
+    (higherPrecThan binOpPrecedence)
+    [UnaryExpr <$> arbitrary, primaryExprGenerator]
+    BinaryExpr
+    (\l op r -> Binary{binRight = r, binOp = op, binLeft = l})
 
 -- Get the logiOpTok
 -- Generate an expression with associated op that is either
@@ -163,24 +156,58 @@ logiEqHigherPrecedenceThan = higherPrecedenceThan logiOpPrecedence
 -- 2. a binary expression
 -- 3. a unary expression
 -- 4. a primary expression
-logiExprPrecedenceGenerator :: Token -> QC.Gen Expr
-logiExprPrecedenceGenerator logiOpTok = do
-  higherPrecedenceOp <- logiEqHigherPrecedenceThan logiOpTok
-  case higherPrecedenceOp of
-    Nothing -> QC.oneof higherPrecedenceExprs
-    Just op -> do
-      l <- logiExprPrecedenceGenerator op
-      r <- logiExprPrecedenceGenerator op
-      let logiExpr = LogicalExpr Logical{logiLeft = l, logiOp = op, logiRight = r}
-       in QC.oneof $
-            return logiExpr : higherPrecedenceExprs
- where
-  higherPrecedenceExprs = [BinaryExpr <$> arbitrary, UnaryExpr <$> arbitrary, primaryExprGenerator]
+logiExprPrecGenerator :: Token -> QC.Gen Expr
+logiExprPrecGenerator =
+  exprPrecGenerator
+    logiOpPrecedence
+    (higherPrecThan logiOpPrecedence)
+    [BinaryExpr <$> arbitrary, UnaryExpr <$> arbitrary, primaryExprGenerator]
+    LogicalExpr
+    (\l op r -> Logical{logiRight = r, logiOp = op, logiLeft = l})
 
-higherPrecedenceThan :: [[TokenType]] -> Token -> QC.Gen (Maybe Token)
-higherPrecedenceThan prec (Token ttype _ _) =
-  let ops = join $ tail $ dropWhile (notElem ttype) prec
-   in if null ops then return Nothing else Just <$> oneTokOf ops
+exprPrecGenerator ::
+  [[TokenType]] ->
+  (Token -> QC.Gen (Maybe Token)) ->
+  [QC.Gen Expr] ->
+  (a -> Expr) ->
+  (Expr -> Token -> Expr -> a) ->
+  Token ->
+  QC.Gen Expr
+exprPrecGenerator precList precGen higherPrecExprs exp expOf op = do
+  precOp <- precGen op
+  case precOp of
+    Nothing -> QC.oneof higherPrecExprs
+    Just op -> do
+      l <-
+        exprPrecGenerator
+          precList
+          (eqHigherPrecThan precList)
+          higherPrecExprs
+          exp
+          expOf
+          op
+      r <-
+        exprPrecGenerator
+          precList
+          (higherPrecThan precList)
+          higherPrecExprs
+          exp
+          expOf
+          op
+      let expr = exp $ expOf l op r
+       in QC.oneof $
+            return expr : higherPrecExprs
+
+higherPrecThan :: [[TokenType]] -> Token -> QC.Gen (Maybe Token)
+higherPrecThan prec (Token ttype _ _) =
+  let ops = uncons $ dropWhile (notElem ttype) prec
+   in case ops of
+        Nothing -> pure Nothing
+        Just (_, []) -> pure Nothing
+        Just (_, tail) -> Just <$> oneTokOf (join tail)
+
+eqHigherPrecThan :: [[TokenType]] -> Token -> QC.Gen (Maybe Token)
+eqHigherPrecThan prec (Token ttype _ _) = Just <$> oneTokOf (join $ dropWhile (notElem ttype) prec)
 
 instance Arbitrary SourcePos where
   arbitrary = liftM3 newPos arbitrary arbitrary arbitrary
@@ -203,8 +230,8 @@ instance Arbitrary ArrowFunction where
 instance Arbitrary Binary where
   arbitrary = do
     op <- binOpGenerator
-    l <- binExprPrecedenceGenerator op
-    r <- binExprPrecedenceGenerator op
+    l <- binExprPrecGenerator op
+    r <- binExprPrecGenerator op
     return $ Binary{binLeft = l, binOp = op, binRight = r}
 
 instance Arbitrary Call where
@@ -231,7 +258,14 @@ instance Arbitrary Dollar where
   arbitrary = Dollar <$> tokGenerator TokenDollar
 
 instance Arbitrary Get where
-  arbitrary = liftM2 Get primaryExprGenerator (tokGenerator TokenIdentifier)
+  arbitrary =
+    liftM2
+      Get
+      (QC.suchThat primaryExprGenerator isNotNumber)
+      (tokGenerator TokenIdentifier)
+   where
+    isNotNumber (LiteralExpr (Literal (Token TokenNumber _ _))) = False
+    isNotNumber _ = True
 
 instance Arbitrary Grouping where
   arbitrary = Grouping <$> arbitrary
@@ -251,8 +285,8 @@ instance Arbitrary Literal where
 instance Arbitrary Logical where
   arbitrary = do
     op <- logiOpGenerator
-    l <- logiExprPrecedenceGenerator op
-    r <- logiExprPrecedenceGenerator op
+    l <- logiExprPrecGenerator op
+    r <- logiExprPrecGenerator op
     return $ Logical{logiLeft = l, logiOp = op, logiRight = r}
 
 instance Arbitrary ObjectInitializer where

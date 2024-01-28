@@ -34,18 +34,18 @@ import Test.QuickCheck (
 import qualified Test.QuickCheck as QC
 import Text.PrettyPrint
 
-main = ppSamples
+main = debugSamples
 
 checkExpressionParser :: Expr -> Property
-checkExpressionParser ast = within 500000 $ case runHSONExprParser (prettyPrintExpr ast) of
+checkExpressionParser ast = within 50000 $ case runHSONExprParser (prettyPrintExpr ast) of
   Left _ -> False
   Right a -> ast == a
 
 qcArgs =
   Args
     { replay = replay stdArgs
-    , maxSuccess = maxSuccess stdArgs
-    , maxSize = 3
+    , maxSuccess = 10000
+    , maxSize = 2
     , maxShrinks = maxShrinks stdArgs
     , maxDiscardRatio = maxDiscardRatio stdArgs
     , chatty = True
@@ -53,7 +53,7 @@ qcArgs =
 runChecks = quickCheckWithResult qcArgs checkExpressionParser
 
 debugSamples = do
-  expr <- sample' (resize 3 arbitrary :: Gen Expr)
+  expr <- sample' (resize 2 arbitrary :: Gen Expr)
   forM_
     expr
     ( \e -> do
@@ -63,7 +63,7 @@ debugSamples = do
     )
 
 ppSamples = do
-  expr <- sample' (resize 3 arbitrary :: Gen Expr)
+  expr <- sample' (resize 2 arbitrary :: Gen Expr)
   forM_
     expr
     (TIO.putStrLn . prettyPrintExpr)
