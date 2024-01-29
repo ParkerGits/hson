@@ -50,6 +50,7 @@ qcArgs =
     , maxDiscardRatio = maxDiscardRatio stdArgs
     , chatty = True
     }
+
 runChecks = quickCheckWithResult qcArgs checkExpressionParser
 
 debugSamples = do

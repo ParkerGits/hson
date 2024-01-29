@@ -439,7 +439,7 @@ parseObject = do
     commaSep (try keyValue <|> key)
    where
     keyValue = do
-      k <- try tokenString <|> identifier
+      k <- try tokenString <|> prop
       colon
       v <- expression
       return (k, Just v)
