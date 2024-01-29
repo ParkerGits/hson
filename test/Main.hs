@@ -45,7 +45,7 @@ qcArgs =
   Args
     { replay = replay stdArgs
     , maxSuccess = 10000
-    , maxSize = 2
+    , maxSize = 6
     , maxShrinks = maxShrinks stdArgs
     , maxDiscardRatio = maxDiscardRatio stdArgs
     , chatty = True
@@ -53,13 +53,20 @@ qcArgs =
 runChecks = quickCheckWithResult qcArgs checkExpressionParser
 
 debugSamples = do
-  expr <- sample' (resize 2 arbitrary :: Gen Expr)
+  expr <- sample' (resize 6 arbitrary :: Gen Expr)
   forM_
     expr
     ( \e -> do
-        TIO.putStrLn $ T.pack $ show e
-        TIO.putStrLn $ prettyPrintExpr e
-        verboseCheckResult $ checkExpressionParser e
+        res <- verboseCheckResult $ checkExpressionParser e
+        case res of
+          QC.Failure{} -> do
+            TIO.putStrLn $
+              T.pack $
+                show
+                  e
+            TIO.putStrLn $
+              prettyPrintExpr e
+          _ -> return ()
     )
 
 ppSamples = do

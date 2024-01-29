@@ -7,6 +7,7 @@ import Data.Char (ord)
 import Data.List (singleton, uncons)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe, isNothing, mapMaybe)
+import Data.Monoid (All (All, getAll))
 import qualified Data.Text as T
 import HSONValue
 import Parser
@@ -69,12 +70,13 @@ letter = QC.frequency alphaFreqList
 letterOrDigit :: QC.Gen Char
 letterOrDigit = QC.frequency $ alphaFreqList ++ digitFreqList
 
-safeStringGenerator = QC.suchThat (T.pack . QC.getUnicodeString <$> arbitrary) prettyPrintable
+-- generates a printable string that contains no unescaped characters
+safeStringGenerator =
+  QC.suchThat
+    (T.pack . QC.getPrintableString <$> arbitrary)
+    escaped
  where
-  -- first 31 ascii characters are not pretty-printed, so avoid them
-  prettyPrintable s = case T.uncons s of
-    Nothing -> True
-    Just (c, s) -> not (T.null s) || (ord c > 31)
+  escaped s = foldr (\a b -> b && not (T.elem a s)) True ['"', '\\']
 
 identifierGenerator =
   T.pack
@@ -131,9 +133,9 @@ primaryExprGenerator =
     [ LiteralExpr <$> arbitrary
     , DollarExpr <$> arbitrary
     , VariableExpr <$> arbitrary
-    , GroupingExpr <$> arbitrary
-    , ArrayInitializerExpr <$> arbitrary
-    , ObjectInitializerExpr <$> arbitrary
+    , GroupingExpr <$> QC.sized (\n -> QC.resize (n `div` 2) arbitrary)
+    , ArrayInitializerExpr <$> QC.sized (\n -> QC.resize (n `div` 2) arbitrary)
+    , ObjectInitializerExpr <$> QC.sized (\n -> QC.resize (n `div` 2) arbitrary)
     ]
 
 -- Get the binOpTok

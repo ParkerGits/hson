@@ -350,7 +350,7 @@ parseUnary = (try parseBangBang <|> try parseBang <|> parseMinus) <*> unary
 parseGet :: HSONParser (Expr -> Expr)
 parseGet = do
   dot
-  property <- identifier
+  property <- prop
   return $ \object -> GetExpr Get{object = object, property = property}
 
 parseCall :: HSONParser (Expr -> Expr)

@@ -18,6 +18,7 @@ import Text.Parsec (
   char,
   getPosition,
   letter,
+  many,
   oneOf,
   (<|>),
  )
@@ -161,6 +162,23 @@ identifier = do
       { tokenType = TokenIdentifier
       , literal = Just $ String $ T.pack name
       , pos = pos
+      }
+
+-- Parses an identifier, but doesn't fail if it is a reserved name
+-- Used to parse properties of objects that may be reserved names
+propIdent = lexeme $ do
+  c <- P.identStart hsonStyle
+  cs <- many (P.identLetter hsonStyle)
+  return (c : cs)
+
+prop = do
+  pos <- getPosition
+  name <- propIdent
+  return
+    Token
+      { tokenType = TokenIdentifier
+      , pos = pos
+      , literal = Just $ String $ T.pack name
       }
 
 parens = P.parens hsonLexer
