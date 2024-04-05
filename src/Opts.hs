@@ -35,12 +35,14 @@ hsonFileInput =
       ( long "hf"
           <> long "hfile"
           <> long "hsonfile"
-          <> metavar "filename.hson"
-          <> help "HSON input file."
+          <> metavar "FILENAME.HSON"
+          <> help "hson input file."
       )
 
 cmdLineIn :: Parser HSONInput
-cmdLineIn = CmdLineIn <$> argument str (metavar "input hson" <> help "HSON input")
+cmdLineIn =
+  CmdLineIn
+    <$> argument str (metavar "SCRIPT" <> help "hson script to be run.")
 
 jsonFileInput :: Parser JSONInput
 jsonFileInput =
@@ -49,7 +51,7 @@ jsonFileInput =
       ( long "jf"
           <> long "jfile"
           <> long "jsonfile"
-          <> metavar "filename.json"
+          <> metavar "FILENAME.JSON"
           <> help "JSON input file."
       )
 
@@ -58,14 +60,14 @@ stdin =
   flag
     StdIn
     NoJSONInput
-    (long "no-json" <> short 'n' <> help "Run HSON without a JSON input.")
+    (long "no-json" <> short 'n' <> help "Run hson without a JSON input.")
 
 printParseTree :: Parser Bool
 printParseTree =
   flag
     False
     True
-    (long "ast" <> short 'a' <> help "Print the HSON parse tree.")
+    (long "ast" <> short 'a' <> help "Print the hson parse tree.")
 
 prettyPrint :: Parser Bool
 prettyPrint =
@@ -74,7 +76,7 @@ prettyPrint =
     True
     ( long "pretty-print"
         <> short 'p'
-        <> help "Pretty print the provided HSON script."
+        <> help "Pretty print the provided hson script."
     )
 
 hideEval :: Parser Bool
@@ -82,13 +84,14 @@ hideEval =
   flag
     False
     True
-    (long "omit-eval" <> short 'o' <> help "Omit the evaluated expression output")
+    (long "omit-eval" <> short 'o' <> help "Omit the evaluated expression output.")
 
-testOpts =
+runHsonOpts :: IO Options
+runHsonOpts =
   execParser $
     info
       (opts <**> helper)
       ( fullDesc
-          <> progDesc "Parse JSON according to given HSON input."
+          <> progDesc "Parse JSON according to given hson input."
           <> header "hson - json processing language"
       )

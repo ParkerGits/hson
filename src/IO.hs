@@ -17,7 +17,7 @@ import PrettyPrinter (prettyPrintProg)
 
 run :: Maybe BL.ByteString -> T.Text -> Options -> IO ()
 run json hson opts = case runHSONParser hson of
-  Left err -> print err
+  Left err -> TIO.putStrLn $ T.pack $ show err
   Right prog -> do
     when (doPrintAst opts) (TIO.putStrLn $ T.pack $ show prog)
     when (doPrettyPrint opts) (TIO.putStrLn $ prettyPrintProg prog)
@@ -27,7 +27,7 @@ runProg :: Maybe BL.ByteString -> Program -> IO ()
 runProg Nothing prog = runInterpretNoJSON prog >>= printResult
 runProg (Just json) prog = case decode json of
   Left err -> print . JSONParsingError $ T.pack err
-  Right json -> runInterpretWithJSON json prog >>= printResult
+  Right parsedJSON -> runInterpretWithJSON parsedJSON prog >>= printResult
 
 printResult :: Either HSONError HSONValue -> IO ()
 printResult (Left err) = TIO.putStrLn $ showError err

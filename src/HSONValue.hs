@@ -18,7 +18,7 @@ import Text.Parsec (SourcePos)
 data HSONValue
   = Function Func
   | Method (HSONValue -> Func)
-  | Lambda Func Environment
+  | Closure Func Environment
   | Array (V.Vector HSONValue)
   | Object (Map.Map T.Text HSONValue)
   | String T.Text
@@ -78,7 +78,7 @@ fromSorted (DescByKey _ v) = v
 showValue :: HSONValue -> T.Text
 showValue (Function _) = "(native function)"
 showValue (Method _) = "(bound function)"
-showValue (Lambda _ _) = "(lambda function)"
+showValue (Closure _ _) = "(closure)"
 showValue (Array v) = T.concat ["[", T.intercalate ", " $ map showValue $ V.toList v, "]"]
 showValue (Object o) = T.concat ["{ ", T.intercalate ", " $ map showEntry $ Map.toList o, " }"]
 showValue (String s) = s
@@ -94,7 +94,7 @@ showEntry (k, v) = k <> ": " <> showValue v
 
 type Environment = Map.Map T.Text HSONValue
 
-newtype Func = Func {fn :: [HSONValue] -> Eval HSONValue} deriving ()
+newtype Func = Func {fn :: [HSONValue] -> Eval HSONValue}
 
 newtype Eval a = Eval {unEval :: ReaderT Environment (ExceptT HSONError IO) a}
   deriving

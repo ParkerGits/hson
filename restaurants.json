@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Parker's Pasta",
+    "city": "Seattle",
+    "state": "Washington",
+    "rating": 4,
+    "price": 1
+  },
+  {
+    "name": "Smashing Sushi",
+    "city": "Portland",
+    "state": "Oregon",
+    "rating": 5,
+    "price": 3
+  },
+  {
+    "name": "Barely Barbecue",
+    "city": "Seattle",
+    "state": "Washington",
+    "rating": 1,
+    "price": 2
+  }
+]

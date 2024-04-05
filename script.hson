@@ -1,0 +1,4 @@
+let addY = |n| => n + y;
+let y = 4;
+// Call error at (line 4, column 4): Undefined variable "y" at (line 2, column 23).
+map([1,2,3], addY)

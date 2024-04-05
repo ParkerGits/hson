@@ -20,7 +20,7 @@ mkMethod :: MethodDefinition -> HSONValue
 mkMethod f = Method (Func . f)
 
 showType :: HSONValue -> T.Text
-showType (Lambda _ _) = "lambda"
+showType (Closure _ _) = "closure"
 showType (Array _) = "array"
 showType (Object _) = "object"
 showType (String _) = "string"

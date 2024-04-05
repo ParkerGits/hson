@@ -34,10 +34,10 @@ import Test.QuickCheck (
 import qualified Test.QuickCheck as QC
 import Text.PrettyPrint
 
-main = debugSamples
+main = runChecks
 
-checkExpressionParser :: Expr -> Property
-checkExpressionParser ast = within 50000 $ case runHSONExprParser (prettyPrintExpr ast) of
+checkExpressionParser :: Expr -> Bool
+checkExpressionParser ast = case runHSONExprParser (prettyPrintExpr ast) of
   Left _ -> False
   Right a -> ast == a
 

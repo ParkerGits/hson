@@ -7,11 +7,12 @@ import JSONParser (decode)
 import Opts (
   HSONInput (CmdLineIn, HSONFileInput),
   Options (hsonInputOpt, jsonInputOpt),
-  testOpts,
+  runHsonOpts,
  )
 
+main :: IO ()
 main = do
-  opts <- testOpts
+  opts <- runHsonOpts
   hsonIn <- readHSON $ hsonInputOpt opts
   jsonIn <- readJSON $ jsonInputOpt opts
   run jsonIn hsonIn opts

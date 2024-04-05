@@ -12,7 +12,6 @@ import Control.Monad.Except (
   MonadError (throwError),
   catchError,
   runExceptT,
-  when,
  )
 import Control.Monad.IO.Class
 import Control.Monad.Reader (
@@ -104,7 +103,7 @@ zipBind idents [] = Map.fromList $ map (,Null) idents
 zipBind (ident : idents) (value : values) = Map.insert ident value $ zipBind idents values
 
 eval :: Expr -> Eval HSONValue
-eval (ArrowFunctionExpr (ArrowFunction params body)) = toLambda params body
+eval (ArrowFunctionExpr (ArrowFunction params body)) = toClosure params body
 eval (ArrayInitializerExpr (ArrayInitializer bracketTok elems)) = Array . V.fromList <$> mapM eval elems
 eval (BinaryExpr (Binary l opTok r)) = do
   left <- eval l
@@ -120,25 +119,22 @@ eval (BinaryExpr (Binary l opTok r)) = do
     Token TokenStar _ _ -> numOp opTok (*) left right
     Token TokenSlash _ _ -> numOp opTok (/) left right
     Token TokenPlus _ _ -> valuePlus opTok left right
-    _ -> throwError $ UnhandledOperator opTok
+    _otherToken -> throwError $ UnhandledOperator opTok
 eval (CallExpr (Call callee tok args)) = do
   res <- eval callee
   case res of
     Function f -> do
       args <- mapM eval args
       fn f args `catchError` (throwError . CallError tok)
-    Lambda f env -> do
+    Closure f env -> do
       args <- mapM eval args
       local (const env) $ fn f args `catchError` (throwError . CallError tok)
-    _ -> throwError $ UncallableExpression tok
+    _uncallableValue -> throwError $ UncallableExpression tok
 eval (ConditionalExpr (Conditional cond matched unmatched)) = do
   condition <- eval cond
   if isTruthy condition then eval matched else eval unmatched
-eval (DollarExpr (Dollar tok)) = do
-  jsonVar <- asks (Map.lookup "$")
-  case jsonVar of
-    Just json -> return json
-    Nothing -> throwError $ UndefinedVariable tok
+eval (DollarExpr (Dollar tok)) =
+  fromMaybe <$> throwError (UndefinedVariable tok) <*> asks (Map.lookup "$")
 eval (GetExpr (Get expr tok@(Token _ (Just idx) _))) = eval expr >>= access tok idx
 eval (GroupingExpr (Grouping expr)) = eval expr
 eval (IndexExpr (Index indexed tok index)) = do
@@ -155,7 +151,7 @@ eval (LogicalExpr (Logical l opTok r)) = do
     Token TokenOrOr _ _ -> if isTruthy left then return left else eval r
     Token TokenAndAnd _ _ -> if isTruthy left then eval r else return left
     Token TokenQuestionQuestion _ _ -> if left == Null then eval r else return left
-    _ -> throwError $ UnhandledOperator opTok
+    _unrecognizedOperator -> throwError $ UnhandledOperator opTok
 eval (ObjectInitializerExpr (ObjectInitializer braceTok entries)) = do
   evalEntries <- mapM evalEntry entries
   return $ Object $ Map.fromList evalEntries
@@ -165,11 +161,8 @@ eval (UnaryExpr (Unary opTok r)) = do
     Token TokenMinus _ _ -> minusValue opTok right
     Token TokenBang _ _ -> return $ Bool $ not $ isTruthy right
     Token TokenBangBang _ _ -> return $ Bool $ isTruthy right
-eval (VariableExpr (Variable tok@(Token TokenIdentifier (Just (String s)) _))) = do
-  env <- ask
-  case Map.lookup s env of
-    Just value -> return value
-    Nothing -> throwError $ UndefinedVariable tok
+eval (VariableExpr (Variable tok@(Token TokenIdentifier (Just (String s)) _))) =
+  fromMaybe <$> throwError (UndefinedVariable tok) <*> asks (Map.lookup s)
 
 numCmp ::
   Token ->
@@ -187,7 +180,7 @@ valuePlus _ (Number x) (Number y) = return $ Number $ x + y
 valuePlus _ (String x) (String y) = return $ String $ x <> y
 valuePlus _ (Number x) (String y) = return $ String $ T.pack (show x) <> y
 valuePlus _ (String x) (Number y) = return $ String $ x <> T.pack (show y)
-valuePlus opTok _ _ = throwError $ TypeError opTok "operands must be either string of number"
+valuePlus opTok _ _ = throwError $ TypeError opTok "operands must be either strings or numbers"
 
 numOp ::
   Token ->
@@ -215,11 +208,12 @@ evalEntry (tok@(Token _ (Just (String k)) _), exp) = case exp of
       Just v -> return (k, v)
       Nothing -> throwError $ UndefinedVariable tok
 
-toLambda :: [Token] -> Expr -> Eval HSONValue
-toLambda params expr = asks (Lambda . Func $ \args -> toLambda' params expr args)
+toClosure :: [Token] -> Expr -> Eval HSONValue
+toClosure params expr =
+  asks $ Closure $ Func (toClosure' params expr)
 
-toLambda' :: [Token] -> Expr -> [HSONValue] -> Eval HSONValue
-toLambda' params expr args
+toClosure' :: [Token] -> Expr -> [HSONValue] -> Eval HSONValue
+toClosure' params expr args
   | length args < length params = throwError $ ArgumentCount (length params) args
   | otherwise = do
       let params' = map toIdent params

@@ -168,15 +168,19 @@ newtype Variable = Variable {varName :: Token}
 
 program :: HSONParser Program
 program = do
-  declarations <- many varStmt
+  declarations <- many declaration
   expr <- expression
   eof
   return (declarations, expr)
 
-varStmt :: HSONParser VarStmt
-varStmt = do
+declaration :: HSONParser VarStmt
+declaration = do
   letVar
-  stmt <- try parseVarDecl <|> try parseObjDestDecl <|> parseArrDestDecl
+  stmt <-
+    try parseVarDecl
+      <|> try parseObjDestDecl
+      <|> try parseArrDestDecl
+      <?> "identifier, destructured object, or destructured array"
   equal
   initializer <- expression
   semicolon
@@ -185,7 +189,8 @@ varStmt = do
 parseVarDecl :: HSONParser (Expr -> VarStmt)
 parseVarDecl = do
   declName <- identifier
-  return $ \expr -> VarDeclStmt VarDecl{declName = declName, initializer = expr}
+  return $
+    \expr -> VarDeclStmt VarDecl{declName = declName, initializer = expr}
 
 parseObjDestDecl :: HSONParser (Expr -> VarStmt)
 parseObjDestDecl = do
@@ -329,7 +334,7 @@ primary =
     <|> try parseIdent
     <|> try parseArray
     <|> try parseObject
-    <|> try parseGrouping
+    <|> parseGrouping
     <?> "expression"
 
 parseArrowFunction :: HSONParser Expr
@@ -473,7 +478,7 @@ runHSONExprParser :: T.Text -> Either ParseError Expr
 runHSONExprParser s = runHSONParser' s expression
 
 runHSONVarStmtParser :: T.Text -> Either ParseError VarStmt
-runHSONVarStmtParser s = runHSONParser' s varStmt
+runHSONVarStmtParser s = runHSONParser' s declaration
 
 runHSONParser' :: T.Text -> HSONParser a -> Either ParseError a
 runHSONParser' s p = runIdentity $ runParserT p () "" s

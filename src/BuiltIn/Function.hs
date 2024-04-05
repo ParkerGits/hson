@@ -4,7 +4,6 @@ module BuiltIn.Function where
 
 import BuiltIn.Helpers
 import Control.Exception
-import Control.Monad.Cont (MonadIO (liftIO))
 import Control.Monad.Error.Class
 import Control.Monad.Reader
 import qualified Data.Aeson as A
@@ -122,39 +121,39 @@ hsonReverse [arg] = throwError $ UnexpectedType "array or string" (showType arg)
 hsonReverse args = throwError $ ArgumentCount 1 args
 
 hsonMap :: FunctionDefinition
-hsonMap [Array arr, Lambda (Func f) env] = Array <$> local (const env) (V.mapM (f . L.singleton) arr)
-hsonMap [Array _, arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonMap [Array arr, Closure (Func f) env] = Array <$> local (const env) (V.mapM (f . L.singleton) arr)
+hsonMap [Array _, arg] = throwError $ UnexpectedType "function" (showType arg)
 hsonMap [arg, _] = throwError $ UnexpectedType "array" (showType arg)
 hsonMap args = throwError $ ArgumentCount 2 args
 
 hsonFilter :: FunctionDefinition
-hsonFilter [Array arr, Lambda f env] = Array <$> local (const env) (V.filterM (returnsTruthy f) arr)
-hsonFilter [Array _, arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonFilter [Array arr, Closure f env] = Array <$> local (const env) (V.filterM (returnsTruthy f) arr)
+hsonFilter [Array _, arg] = throwError $ UnexpectedType "function" (showType arg)
 hsonFilter [arg, _] = throwError $ UnexpectedType "array" (showType arg)
 hsonFilter args = throwError $ ArgumentCount 2 args
 
 hsonReduce :: FunctionDefinition
-hsonReduce [Array arr, Lambda (Func f) env, initial] = local (const env) (V.foldM (\a b -> f [a, b]) initial arr)
-hsonReduce [Array _, arg, _] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonReduce [Array arr, Closure (Func f) env, initial] = local (const env) (V.foldM (\a b -> f [a, b]) initial arr)
+hsonReduce [Array _, arg, _] = throwError $ UnexpectedType "function" (showType arg)
 hsonReduce [arg, _, _] = throwError $ UnexpectedType "array" (showType arg)
 hsonReduce args = throwError $ ArgumentCount 2 args
 
 hsonEvery :: FunctionDefinition
-hsonEvery [Array arr, Lambda f env] = local (const env) (Bool <$> vAllM (returnsTruthy f) arr)
-hsonEvery [Array _, arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonEvery [Array arr, Closure f env] = local (const env) (Bool <$> vAllM (returnsTruthy f) arr)
+hsonEvery [Array _, arg] = throwError $ UnexpectedType "function" (showType arg)
 hsonEvery [arg, _] = throwError $ UnexpectedType "array" (showType arg)
 hsonEvery args = throwError $ ArgumentCount 2 args
 
 hsonSome :: FunctionDefinition
-hsonSome [Array arr, Lambda f env] = local (const env) (Bool <$> vAnyM (returnsTruthy f) arr)
-hsonSome [Array _, arg] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonSome [Array arr, Closure f env] = local (const env) (Bool <$> vAnyM (returnsTruthy f) arr)
+hsonSome [Array _, arg] = throwError $ UnexpectedType "function" (showType arg)
 hsonSome [arg, _] = throwError $ UnexpectedType "array" (showType arg)
 hsonSome args = throwError $ ArgumentCount 2 args
 
 hsonFind :: FunctionDefinition
-hsonFind [Array arr, Lambda f env] = local (const env) (fromMaybe Null <$> vFindM (returnsTruthy f) arr)
-hsonFind [Array _, arg] = throwError $ UnexpectedType "lambda" (showType arg)
-hsonFind [arg, _] = throwError $ UnexpectedType "lambda" (showType arg)
+hsonFind [Array arr, Closure f env] = local (const env) (fromMaybe Null <$> vFindM (returnsTruthy f) arr)
+hsonFind [Array _, arg] = throwError $ UnexpectedType "function" (showType arg)
+hsonFind [arg, _] = throwError $ UnexpectedType "function" (showType arg)
 hsonFind args = throwError $ ArgumentCount 2 args
 
 hsonSort :: FunctionDefinition

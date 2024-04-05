@@ -40,33 +40,33 @@ arrayReverse this [] = hsonReverse [this]
 arrayReverse _ args = throwError $ ArgumentCount 0 args
 
 arrayMap :: MethodDefinition
-arrayMap (Array arr) [Lambda (Func f) env] = hsonMap [Array arr, Lambda (Func f) env]
-arrayMap _ [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+arrayMap (Array arr) [Closure (Func f) env] = hsonMap [Array arr, Closure (Func f) env]
+arrayMap _ [arg] = throwError $ UnexpectedType "closure" (showType arg)
 arrayMap _ args = throwError $ ArgumentCount 1 args
 
 arrayFilter :: MethodDefinition
-arrayFilter (Array arr) [Lambda f env] = Array <$> local (const env) (V.filterM (returnsTruthy f) arr)
-arrayFilter _ [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+arrayFilter (Array arr) [Closure f env] = Array <$> local (const env) (V.filterM (returnsTruthy f) arr)
+arrayFilter _ [arg] = throwError $ UnexpectedType "closure" (showType arg)
 arrayFilter _ args = throwError $ ArgumentCount 1 args
 
 arrayReduce :: MethodDefinition
-arrayReduce (Array arr) [Lambda (Func f) env, initial] = local (const env) (V.foldM (\a b -> f [a, b]) initial arr)
-arrayReduce (Array arr) [arg, _] = throwError $ UnexpectedType "lambda" (showType arg)
+arrayReduce (Array arr) [Closure (Func f) env, initial] = local (const env) (V.foldM (\a b -> f [a, b]) initial arr)
+arrayReduce (Array arr) [arg, _] = throwError $ UnexpectedType "closure" (showType arg)
 arrayReduce _ args = throwError $ ArgumentCount 2 args
 
 arrayEvery :: MethodDefinition
-arrayEvery (Array arr) [Lambda f env] = local (const env) (Bool <$> vAllM (returnsTruthy f) arr)
-arrayEvery (Array arr) [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+arrayEvery (Array arr) [Closure f env] = local (const env) (Bool <$> vAllM (returnsTruthy f) arr)
+arrayEvery (Array arr) [arg] = throwError $ UnexpectedType "closure" (showType arg)
 arrayEvery _ args = throwError $ ArgumentCount 1 args
 
 arraySome :: MethodDefinition
-arraySome (Array arr) [Lambda f env] = local (const env) (Bool <$> vAnyM (returnsTruthy f) arr)
-arraySome (Array arr) [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+arraySome (Array arr) [Closure f env] = local (const env) (Bool <$> vAnyM (returnsTruthy f) arr)
+arraySome (Array arr) [arg] = throwError $ UnexpectedType "closure" (showType arg)
 arraySome _ args = throwError $ ArgumentCount 1 args
 
 arrayFind :: MethodDefinition
-arrayFind (Array arr) [Lambda f env] = local (const env) (fromMaybe Null <$> vFindM (returnsTruthy f) arr)
-arrayFind (Array arr) [arg] = throwError $ UnexpectedType "lambda" (showType arg)
+arrayFind (Array arr) [Closure f env] = local (const env) (fromMaybe Null <$> vFindM (returnsTruthy f) arr)
+arrayFind (Array arr) [arg] = throwError $ UnexpectedType "closure" (showType arg)
 arrayFind _ args = throwError $ ArgumentCount 1 args
 
 arraySort :: MethodDefinition
